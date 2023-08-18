@@ -1,7 +1,6 @@
 package searchengine.services;
 
 import lombok.RequiredArgsConstructor;
-import org.hibernate.type.LocalDateType;
 import org.springframework.stereotype.Service;
 import searchengine.config.Site;
 import searchengine.config.SitesList;
@@ -19,20 +18,11 @@ import java.util.*;
 @Service
 @RequiredArgsConstructor
 public class StatisticsServiceImpl implements StatisticsService {
-
-    private final Random random = new Random();
     private final SitesList sites;
     private final IndexingServiceImpl indexingService;
 
     @Override
     public StatisticsResponse getStatistics() {
-        String[] statuses = {"INDEXED", "FAILED", "INDEXING"};
-        String[] errors = {
-                "Ошибка индексации: главная страница сайта не доступна",
-                "Ошибка индексации: сайт не доступен",
-                ""
-        };
-
         // Db actualization sites from config:
         HashMap<String, String> sitesUrlNameDb = new HashMap<>(indexingService.getSitesList());
         for (Site site : sites.getSites()) {

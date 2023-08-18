@@ -54,9 +54,15 @@ public interface IndexingService {
 
     int getLemmaCountByLemmaSiteId(String lemma, int siteId);
 
+    List<Integer> getLemmaIdsByLemmasSiteId(List<String> lemmas, int sId);
+
     List<Integer> getIndexLemmaId(int pageId);
 
     float getIndexRank(int pageId, int lemmaId);
+
+    List<Integer> getIndexPageIdByLemmaIdPageIds(int lemmaId, List<Integer> pageIds);
+
+    float getIndexSumRank(int pageId, List<Integer> lemmaIds);
 
     void deleteSiteById(int id);
 

@@ -1,7 +1,6 @@
 package searchengine.services;
 
 import lombok.Getter;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import searchengine.config.Options;
 import searchengine.config.SitesList;
@@ -25,7 +24,6 @@ import searchengine.utils.ForkJoinParser;
 import searchengine.utils.LemmaFinder;
 
 @Service
-@RequiredArgsConstructor
 @Getter
 
 public class IndexingServiceImpl implements IndexingService {
@@ -37,7 +35,22 @@ public class IndexingServiceImpl implements IndexingService {
     private final PageRepository pageRepository;
     private final LemmaRepository lemmaRepository;
     private final IndexRepository indexRepository;
-    private volatile HashMap<Integer, ForkJoinPool> idxingPools = new HashMap<>();
+    private volatile HashMap<Integer, ForkJoinPool> indexingPools = new HashMap<>();
+    private final LemmaFinder lemmaFinderRus, lemmaFinderEng;
+
+
+    public IndexingServiceImpl(SitesList sites, Options options, SiteRepository siteRepository,
+                               PageRepository pageRepository, LemmaRepository lemmaRepository,
+                               IndexRepository indexRepository) throws IOException {
+        this.sites = sites;
+        this.options = options;
+        this.siteRepository = siteRepository;
+        this.pageRepository = pageRepository;
+        this.lemmaRepository = lemmaRepository;
+        this.indexRepository = indexRepository;
+        lemmaFinderRus = LemmaFinder.getInstanceRus();
+        lemmaFinderEng = LemmaFinder.getInstanceEng();
+    }
 
     @Override
     public void updateIndexRank(int pageId, int lemmaId, float rank) {
@@ -274,6 +287,11 @@ public class IndexingServiceImpl implements IndexingService {
     }
 
     @Override
+    public List<Integer> getLemmaIdsByLemmasSiteId(List<String> lemmas, int sId) {
+        return lemmaRepository.findAllContainsByLemmasSiteId(lemmas, sId);
+    }
+
+    @Override
     public List<Integer> getIndexLemmaId(int pageId) {
         List<Index> indexList = indexRepository.findAllContains(pageId);
         List<Integer> lemmaIds = new ArrayList<>();
@@ -293,6 +311,16 @@ public class IndexingServiceImpl implements IndexingService {
     }
 
     @Override
+    public List<Integer> getIndexPageIdByLemmaIdPageIds(int lemmaId, List<Integer> pageIds) {
+        return indexRepository.findAllPages(lemmaId, pageIds);
+    }
+
+    @Override
+    public float getIndexSumRank(int pageId, List<Integer> lemmaIds) {
+        return indexRepository.getIndexSumRank(pageId, lemmaIds);
+    }
+
+    @Override
     public IndexingResponse startIndexing() {
         String[] errors = {
                 "Индексация уже запущена",
@@ -308,7 +336,7 @@ public class IndexingServiceImpl implements IndexingService {
             return response;
         }
 
-        idxingPools.clear();
+        indexingPools.clear();
 
         // Удалить все имеющиеся данные по сайтам (записи из таблиц site,page,lemma,_index):
         for (searchengine.config.Site site : sites.getSites()) {
@@ -340,11 +368,12 @@ public class IndexingServiceImpl implements IndexingService {
                             // ForkJoinPool process. Waiting ...
                             ForkJoinParser parserFJ = new ForkJoinParser(site.getUrl(), sId, this);
                             ForkJoinPool pool = new ForkJoinPool();
-                            getIdxingPools().put(sId, pool);
+                            getIndexingPools().put(sId, pool);
                             pool.invoke(parserFJ);
                             List<String> listFJ = new ArrayList<>(parserFJ.join());
                             //listFJ - pages list
                             // ForkJoinPool process: the end.
+                            System.out.println("Amount indexed pages = " + listFJ.size() + ". Site name = " + site.getName());
 
                             // В процессе обхода постоянно обновлять дату и время в поле status_time таблицы site на текущее.
                             // По завершении обхода изменить статус (поле status) на INDEXED:
@@ -379,13 +408,14 @@ public class IndexingServiceImpl implements IndexingService {
             return response;
         }
 
-        if (idxingPools.size() != getSiteStatusCount(Status.INDEXING)) {
+        if (indexingPools.size() != getSiteStatusCount(Status.INDEXING)) {
             System.out.println("ForkJoinPool not synchronized with count of indexing sites. Waiting 60 seconds ...");
             try {
                 Thread.sleep(60000);
             } catch (InterruptedException ex) {
+                ex.printStackTrace();
             }
-            if (idxingPools.size() != getSiteStatusCount(Status.INDEXING)) {
+            if (indexingPools.size() != getSiteStatusCount(Status.INDEXING)) {
                 IndexingResponse response = new IndexingResponse();
                 response.setResult(false);
                 response.setError(errors[3]); //"Ошибка остановки индексации"
@@ -393,10 +423,10 @@ public class IndexingServiceImpl implements IndexingService {
             }
         }
 
-        // Останавить все потоки и записать в базу данных для всех сайтов, страницы которых ещё не удалось обойти,
+        // Остановить все потоки и записать в базу данных для всех сайтов, страницы которых ещё не удалось обойти,
         // состояние FAILED и текст ошибки «Индексация остановлена пользователем»:
-        Iterator<Map.Entry<Integer, ForkJoinPool>> iterator = idxingPools.entrySet().iterator();
-        int i = idxingPools.size();
+        Iterator<Map.Entry<Integer, ForkJoinPool>> iterator = indexingPools.entrySet().iterator();
+        int i = indexingPools.size();
         while (iterator.hasNext()) {
             Map.Entry<Integer, ForkJoinPool> entry = iterator.next();
             if (entry.getValue() != null && getSiteStatus(entry.getKey()) == Status.INDEXING) {
@@ -435,7 +465,7 @@ public class IndexingServiceImpl implements IndexingService {
 
         IndexingResponse response = new IndexingResponse();
         if (i == 0) { // all pools have been successfully terminated
-            idxingPools.clear();
+            indexingPools.clear();
             response.setResult(true);
             response.setError(errors[2]); //""
         } else {
@@ -500,7 +530,7 @@ public class IndexingServiceImpl implements IndexingService {
     }
 
     public boolean indexPageTreatment(String url, int siteId, String pageUrl/*page.path*/) {
-        Document doc = null;
+        Document doc;
         int pageId;
 
         pageId = getPageId(pageUrl, siteId);
@@ -539,14 +569,11 @@ public class IndexingServiceImpl implements IndexingService {
         pageId = getPageId(pageUrl, siteId);
         String text = doc.outerHtml();
 
-        LemmaFinder lemmaFinder = null;
-        try {
-            lemmaFinder = LemmaFinder.getInstance();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-        for (Map.Entry<String, Integer> entry : lemmaFinder.collectLemmas(text).entrySet()) {
-            System.out.println(entry.getKey() + "     " + entry.getValue());
+        Map<String, Integer> lemmas = new HashMap<>(lemmaFinderRus.collectLemmas(text, Language.RUS));
+        Map<String, Integer> lemmasEng = new HashMap<>(lemmaFinderEng.collectLemmas(text, Language.ENG));
+        lemmas.putAll(lemmasEng);
+
+        for (Map.Entry<String, Integer> entry : lemmas.entrySet()) {
             // lemma insert/update
             int lId = getLemmaId(entry.getKey(), siteId);
             if (lId == NOTFOUND) {
@@ -575,6 +602,14 @@ public class IndexingServiceImpl implements IndexingService {
                 document = Jsoup.connect(url).userAgent(getOptions().getUserAgent())
                         .followRedirects(false)
                         .referrer(getOptions().getReferrer()).get();
+
+                if (getPageId(path, siteId) == NOTFOUND) { // page not found
+                    // Добавить информацию в page таблицу:
+                    insertPage(siteId, path, code, document.outerHtml());
+                } else {
+                    // Страница path уже обрабатывалась
+                    document = null;
+                }
             } catch (IOException e) {
                 e.printStackTrace();
                 document = null;
@@ -583,14 +618,6 @@ public class IndexingServiceImpl implements IndexingService {
             document = null;
             // Обновить информацию в site таблице:
             updateSiteLastError(siteId, response.statusCode() + ' ' + response.statusMessage());
-        }
-
-        if (getPageId(path, siteId) == NOTFOUND) { // page not found
-            // Добавить информацию в page таблицу:
-            insertPage(siteId, path, code, document.outerHtml());
-        } else {
-            // Страница path уже обрабатывалась
-            document = null;
         }
 
         return document;

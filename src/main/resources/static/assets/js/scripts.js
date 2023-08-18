@@ -4,21 +4,21 @@
     var px = ''; //'rt--'
 
     /**
-     * Р¤СѓРЅРєС†РёСЏ РґР»СЏ РІС‹РІРѕРґР° РЅР°Р±РѕСЂР° jQuery РїРѕ СЃРµР»РµРєС‚РѕСЂСѓ, Рє СЃРµР»РµРєС‚РѕСЂСѓ РґРѕР±Р°РІР»СЏСЋС‚СЃСЏ
-     * РїСЂРµС„РёРєСЃС‹
+     * Функция для вывода набора jQuery по селектору, к селектору добавляются
+     * префиксы
      *
-     * @param {string} selector РџСЂРёРЅРёРјР°РµС‚ СЃРµР»РµРєС‚РѕСЂ РґР»СЏ С„РѕСЂРјРёСЂРѕРІР°РЅРёСЏ РЅР°Р±РѕСЂР°
-     * @return {jQuery} Р’РѕР·РІСЂР°С‰Р°РµС‚ РЅРѕРІС‹Р№ jQuery РЅР°Р±РѕСЂ РїРѕ РІС‹Р±СЂР°РЅРЅС‹Рј СЃРµР»РµРєС‚РѕСЂР°Рј
+     * @param {string} selector Принимает селектор для формирования набора
+     * @return {jQuery} Возвращает новый jQuery набор по выбранным селекторам
      */
     function $x(selector) {
         return $(x(selector));
     }
 
     /**
-     * Р¤СѓРЅРєС†РёСЏ РґР»СЏ Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРѕРіРѕ РґРѕР±Р°РІР»РµРЅРёСЏ РїСЂРµС„РёРєСЃРѕРІ Рє СЃРµР»РµРєС‚РѕСЂС‹
+     * Функция для автоматического добавления префиксов к селекторы
      *
-     * @param {string} selector РџСЂРёРЅРёРјР°РµС‚ СЃРµР»РµРєС‚РѕСЂ РґР»СЏ С„РѕСЂРјРёСЂРѕРІР°РЅРёСЏ РЅР°Р±РѕСЂР°
-     * @return {string} Р’РѕР·РІСЂР°С‰Р°РµС‚ РЅРѕРІС‹Р№ jQuery РЅР°Р±РѕСЂ РїРѕ РІС‹Р±СЂР°РЅРЅС‹Рј СЃРµР»РµРєС‚РѕСЂР°Рј
+     * @param {string} selector Принимает селектор для формирования набора
+     * @return {string} Возвращает новый jQuery набор по выбранным селекторам
      */
     function x(selector) {
         var arraySelectors = selector.split('.'),
@@ -1283,7 +1283,7 @@ var form = function(){
                 }
             });
             
-            // Р’Р°Р»РёРґР°С†РёСЏ РїРѕР»РµР№
+            // Валидация полей
             $input.on('blur', function(){
                 var $this = $(this),
                     validate = $this.data('validate'),
@@ -1297,7 +1297,7 @@ var form = function(){
                                 if (!$this.val()
                                     && !$this.prop('disabled')
                                     ) {
-                                        message += 'Р­С‚Рѕ РїРѕР»Рµ РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ РґР»СЏ Р·Р°РїРѕР»РЅРµРЅРёСЏ. ';
+                                        message += 'Это поле обязательно для заполнения. ';
                                         error = true;
                                 }
                                 break;
@@ -1306,7 +1306,7 @@ var form = function(){
                                     && !$this.val().match(/\w+@\w+\.\w+/)
                                     && !$this.prop('disabled')
                                     ) {
-                                        message += 'РќСѓР¶РЅРѕ РІРІРµСЃС‚Рё Р°РґСЂРµСЃ РїРѕС‡С‚С‹ РІ С„РѕСЂРјР°С‚Рµ xxx@xxx.xx';
+                                        message += 'Нужно ввести адрес почты в формате xxx@xxx.xx';
                                         error = true;
                                 }
                                 break;
@@ -1315,7 +1315,7 @@ var form = function(){
                                     && !$this.val().replace(' ', '').match(/\d{6}/)
                                     && !$this.prop('disabled')
                                     ){
-                                        message += 'РљРѕРґ РґРѕР»Р¶РµРЅ СЃРѕСЃС‚РѕСЏС‚СЊ РёР· 6 С†РёС„СЂ';
+                                        message += 'Код должен состоять из 6 цифр';
                                         error = true;
                                 }
             
@@ -1401,7 +1401,7 @@ var menu = function(){
         init: function(){
             if (window.innerWidth<991) {
             $(".menuModal").css('height', menuHeight);
-            // РњРµРЅСЋ РґР»СЏ РјРѕР±РёР»СЊРЅС‹С…
+            // Меню для мобильных
                 $(".menuTrigger").each(function () {
                     $($(this).attr('href')).css('height', 0);
                 });
@@ -1452,7 +1452,7 @@ var API = function(){
                 if (result.status >= 200 && result.status <= 500) {
                     cb(result.responseJSON, $this, data);
                 } else {
-                    alert('РћС€РёР±РєР° ' + result.status);
+                    alert('Ошибка ' + result.status);
                 }
             }
         });
@@ -1508,9 +1508,9 @@ var API = function(){
                         $this.next('.API-error').remove();
                     }
                     if ($this.next('.API-success').length) {
-                        $this.next('.API-success').text('РЎС‚СЂР°РЅРёС†Р° РґРѕР±Р°РІР»РµРЅР°/РѕР±РЅРѕРІР»РµРЅР° СѓСЃРїРµС€РЅРѕ');
+                        $this.next('.API-success').text('Страница добавлена/обновлена успешно');
                     } else {
-                        $this.after('<div class="API-success">РЎС‚СЂР°РЅРёС†Р° РїРѕСЃС‚Р°РІР»РµРЅР° РІ РѕС‡РµСЂРµРґСЊ РЅР° РѕР±РЅРѕРІР»РµРЅРёРµ / РґРѕР±Р°РІР»РµРЅРёРµ</div>');
+                        $this.after('<div class="API-success">Страница поставлена в очередь на обновление / добавление</div>');
                     }
                 } else {
                     if ($this.next('.API-success').length) {
@@ -1753,25 +1753,22 @@ var API = function(){
                                 };
                             } else {
                                 data = {
-                                    site: $this.find('[name="site"]').val(),
                                     query: $this.find('[name="query"]').val(),
-                                    offset: $this.find('[name="offset"]').val(),
-                                    limit: $this.find('[name="limit"]').val()
+                                    offset: 0,
+                                    limit: $this.data('sendlimit')
                                 };
-                                if ( $this.find('[name="offset"]').val() ) {
-                                    data.offset = $this.find('[name="offset"]').val();
-                                } else {
-                                    data.offset = 0;
-                                }
-                                if ( $this.find('[name="limit"]').val() ) {
-                                    data.limit = $this.find('[name="limit"]').val();
-                                } else {
-                                    data.limit = 20;
-                                }
+																			
+																					  
+										
+													
+								 
+																		   
+																					
+										
+													
+								 
                                 if ( $this.find('[name="site"]').val() ) {
                                     data.site = $this.find('[name="site"]').val();
-                                } else {
-                                    data.site = '';
                                 }
                             }
                             break;

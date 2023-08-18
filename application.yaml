@@ -2,8 +2,6 @@ indexing-settings:
   sites:
     - url: http://www.playback.ru/
       name: playback.ru
-    - url: https://volochek.life/
-      name: volochek.life
 
 options.userAgent: Mozilla/5.0 (Windows; U; WindowsNT 5.1; en-US; rv1.8.1.6) Gecko/20070725 Firefox/2.0.0.6
 options.referrer: http://www.google.com

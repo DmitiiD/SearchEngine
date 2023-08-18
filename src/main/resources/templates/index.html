@@ -125,7 +125,7 @@
                   <h2 class="Section-title">Search
                   </h2>
                 </div>
-                <form class="form form_close" action="#" method="post" data-send="search">
+                <form class="form form_close" action="#" method="post" data-send="search" data-sendlimit="10">
                   <div class="form-group">
                     <div class="form-selectWrap">
                       <!-- - var options = setOptions(items, ['value', 'selected', 'disabled']);-->
@@ -139,10 +139,6 @@
                     <input class="form-input" id="query" name="query" type="text" placeholder="Query"/>
                     <button class="btn btn_primary form-btn" type="submit">Search
                     </button>
-                  </div>
-                  <div class="form-group form-group_row">
-                    <input class="form-input" id="offset" name="offset" type="text" placeholder="Offset"/>
-                    <input class="form-input" id="limit" name="limit" type="text" placeholder="Limit"/>
                   </div>
                 </form>
                 <div class="SearchResult">

@@ -26,6 +26,9 @@ public interface LemmaRepository extends JpaRepository<Lemma, Long> {
     @Query(value = "SELECT * from lemma where site_id = :siteId and lower(lemma) = :lemma", nativeQuery = true)
     List<Lemma> findAllContains(@Param("lemma") String lemma, @Param("siteId") int siteId);
 
+    @Query(value = "SELECT id from lemma where site_id = :siteId and lower(lemma) in (:lemmas)", nativeQuery = true)
+    List<Integer> findAllContainsByLemmasSiteId (@Param("lemmas") List<String> lemmas, @Param("siteId") int siteId);
+
     @Query(value = "SELECT count(*) from lemma where site_id = :siteId", nativeQuery = true)
     int calcLemmaCountBySiteId(@Param("siteId") int siteId);
 

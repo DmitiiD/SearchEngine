@@ -5,6 +5,7 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+import searchengine.model.Language;
 import searchengine.services.IndexingServiceImpl;
 
 import java.io.IOException;
@@ -16,7 +17,6 @@ import java.util.concurrent.RecursiveTask;
 
 public class ForkJoinParser extends RecursiveTask<Set<String>> {
     private static final int HANDSHAKE_TIMEOUT = 150;
-    private final float EPS = 0.00001f;
     private String url;
     private Document doc;
     private String host, parentLink, protocol;
@@ -24,7 +24,9 @@ public class ForkJoinParser extends RecursiveTask<Set<String>> {
     private IndexingServiceImpl idxService;
 
     public ForkJoinParser(String url, int siteId, IndexingServiceImpl idxService) {
-        for (Map.Entry<Integer, ForkJoinPool> entry : idxService.getIdxingPools().entrySet()) {
+        float EPS = 0.00001f;
+
+        for (Map.Entry<Integer, ForkJoinPool> entry : idxService.getIndexingPools().entrySet()) {
             if (entry.getValue().isTerminating()) {
                 System.out.println("Shutdown flag has been found for " + url);
                 return;
@@ -38,7 +40,7 @@ public class ForkJoinParser extends RecursiveTask<Set<String>> {
         url = removeLastSymbol(url, '/').toLowerCase();
         this.url = url;
 
-        URL homeURL = null;
+        URL homeURL;
         try {
             homeURL = new URL(url);
         } catch (MalformedURLException e) {
@@ -47,7 +49,7 @@ public class ForkJoinParser extends RecursiveTask<Set<String>> {
         protocol = homeURL.getProtocol().toLowerCase();
         host = homeURL.getHost().toLowerCase();
         int idx = protocol.length() + "://".length();
-        parentLink = url.substring(idx, url.length());
+        parentLink = url.substring(idx);
 
         System.out.println(url); // To console for showing process progress
         // В процессе обхода постоянно обновлять дату и время в поле status_time таблицы site на текущее:
@@ -58,7 +60,7 @@ public class ForkJoinParser extends RecursiveTask<Set<String>> {
             System.out.println("Error getPageResponse() for " + url);
         } else {
             String strTmp = removeLastSymbol(idxService.getSiteUrl(siteId), '/');
-            String path = url.substring(strTmp.length(), url.length());
+            String path = url.substring(strTmp.length());
             if (path.isEmpty()) {
                 path = "/"; // адрес страницы от корня сайта (должен начинаться со слэша, например: /news/372189/)
             }
@@ -69,14 +71,17 @@ public class ForkJoinParser extends RecursiveTask<Set<String>> {
                 int pageId = idxService.getPageId(path, this.siteId);
                 String text = doc.outerHtml();
 
-                LemmaFinder lemmaFinder = null;
+                LemmaFinder lemmaFinderRus, lemmaFinderEng;
                 try {
-                    lemmaFinder = LemmaFinder.getInstance();
+                    lemmaFinderRus = LemmaFinder.getInstanceRus();
+                    lemmaFinderEng = LemmaFinder.getInstanceEng();
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
-                for (Map.Entry<String, Integer> entry : lemmaFinder.collectLemmas(text).entrySet()) {
-                    System.out.println(entry.getKey() + "     " + entry.getValue());
+                Map<String, Integer> lemmas = new HashMap<>(lemmaFinderRus.collectLemmas(text, Language.RUS));
+                Map<String, Integer> lemmasEng = new HashMap<>(lemmaFinderEng.collectLemmas(text, Language.ENG));
+                lemmas.putAll(lemmasEng);
+                for (Map.Entry<String, Integer> entry : lemmas.entrySet()) {
                     // lemma insert/update
                     int lId = idxService.getLemmaId(entry.getKey(), this.siteId);
                     if (lId == -1) {
@@ -109,6 +114,13 @@ public class ForkJoinParser extends RecursiveTask<Set<String>> {
                 document = Jsoup.connect(url).userAgent(idxService.getOptions().getUserAgent())
                         .followRedirects(false)
                         .referrer(idxService.getOptions().getReferrer()).get();
+                if (idxService.getPageId(path, siteId) == -1) { // page not found
+                    // Добавить информацию в page таблицу:
+                    idxService.insertPage(siteId, path, code, document.outerHtml());
+                } else {
+                    // Страница path уже обрабатывалась
+                    document = null;
+                }
             } catch (IOException e) {
                 e.printStackTrace();
                 document = null;
@@ -117,14 +129,6 @@ public class ForkJoinParser extends RecursiveTask<Set<String>> {
             document = null;
             // Обновить информацию в site таблице:
             idxService.updateSiteLastError(siteId, response.statusCode() + ' ' + response.statusMessage());
-        }
-
-        if (idxService.getPageId(path, siteId) == -1) { // page not found
-            // Добавить информацию в page таблицу:
-            idxService.insertPage(siteId, path, code, document.outerHtml());
-        } else {
-            // Страница path уже обрабатывалась
-            document = null;
         }
 
         return document;
@@ -154,7 +158,7 @@ public class ForkJoinParser extends RecursiveTask<Set<String>> {
 
     @Override
     protected Set<String> compute() {
-        for (Map.Entry<Integer, ForkJoinPool> entry : idxService.getIdxingPools().entrySet()) {
+        for (Map.Entry<Integer, ForkJoinPool> entry : idxService.getIndexingPools().entrySet()) {
             if (entry.getValue().isTerminating()) {
                 System.out.println("Shutdown flag has been found for " + url);
                 return null;

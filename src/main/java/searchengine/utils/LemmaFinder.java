@@ -1,7 +1,9 @@
 package searchengine.utils;
 
 import org.apache.lucene.morphology.LuceneMorphology;
+import org.apache.lucene.morphology.english.EnglishLuceneMorphology;
 import org.apache.lucene.morphology.russian.RussianLuceneMorphology;
+import searchengine.model.Language;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -11,10 +13,15 @@ import java.util.Map;
 
 public class LemmaFinder {
     private final LuceneMorphology luceneMorphology;
-    private static final String[] particlesNames = new String[]{"МЕЖД", "ПРЕДЛ", "СОЮЗ"};
+    private static final String[] particlesNames = new String[]{"МЕЖД", "ПРЕДЛ", "СОЮЗ", "ARTICLE", "PREP", "CONJ"};
 
-    public static LemmaFinder getInstance() throws IOException {
+    public static LemmaFinder getInstanceRus() throws IOException {
         LuceneMorphology morphology = new RussianLuceneMorphology();
+        return new LemmaFinder(morphology);
+    }
+
+    public static LemmaFinder getInstanceEng() throws IOException {
+        LuceneMorphology morphology = new EnglishLuceneMorphology();
         return new LemmaFinder(morphology);
     }
 
@@ -32,8 +39,14 @@ public class LemmaFinder {
      * @param text текст из которого будут выбираться леммы
      * @return ключ является леммой, а значение количеством найденных лемм
      */
-    public Map<String, Integer> collectLemmas(String text) {
-        String[] words = arrayContainsRussianWords(text);
+    public Map<String, Integer> collectLemmas(String text, Language language) {
+        String[] words;
+        char tmp;
+        if (language == Language.RUS) {
+            words = arrayContainsRussianWords(text);
+        } else {
+            words = arrayContainsEnglishWords(text);
+        }
         HashMap<String, Integer> lemmas = new HashMap<>();
 
         for (String word : words) {
@@ -44,6 +57,14 @@ public class LemmaFinder {
             List<String> wordBaseForms = luceneMorphology.getMorphInfo(word);
             if (anyWordBaseBelongToParticle(wordBaseForms)) {
                 continue;
+            }
+
+            if (word.length() == 1) {
+                tmp = word.charAt(0);
+                if ((tmp >= 'a' && tmp <= 'z') || (tmp >= 'A' && tmp <= 'Z') ||
+                        (tmp >= 'а' && tmp <= 'я') || (tmp >= 'А' && tmp <= 'Я')) {
+                    continue;
+                }
             }
 
             List<String> normalForms = luceneMorphology.getNormalForms(word);
@@ -66,12 +87,7 @@ public class LemmaFinder {
     // предлоги или нет. Если да - true
     public boolean isParticle(String word) {
         List<String> wordBaseForms = luceneMorphology.getMorphInfo(word);
-        if (anyWordBaseBelongToParticle(wordBaseForms)) {
-            return true;
-        }
-        else {
-            return false;
-        }
+        return anyWordBaseBelongToParticle(wordBaseForms);
     }
 
     // Очистка кода веб-страниц от HTML-тегов
@@ -84,6 +100,20 @@ public class LemmaFinder {
     public String[] arrayContainsRussianWords(String text) {
         return text.toLowerCase(Locale.ROOT)
                 .replaceAll("([^а-я\\s])", " ")
+                .trim()
+                .split("\\s+");
+    }
+
+    public String[] arrayContainsEnglishWords(String text) {
+        return text.toLowerCase(Locale.ROOT)
+                .replaceAll("([^a-z\\s])", " ")
+                .trim()
+                .split("\\s+");
+    }
+
+    public String[] arrayContainsAnyWords(String text) {
+        return text.toLowerCase(Locale.ROOT)
+                .replaceAll("([^a-zа-я\\s])", " ")
                 .trim()
                 .split("\\s+");
     }

@@ -1,12 +1,13 @@
 package searchengine.services;
 
 import lombok.Getter;
-import lombok.RequiredArgsConstructor;
+//import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import searchengine.config.Site;
 import searchengine.config.SitesList;
 import searchengine.dto.statistics.DataSearchItem;
 import searchengine.dto.statistics.SearchResponse;
+import searchengine.model.Language;
 import searchengine.model.Status;
 import searchengine.utils.LemmaFinder;
 
@@ -15,11 +16,9 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 @Getter
 
 public class SearchServiceImpl implements SearchService {
-    //For Search.
     //Исключать из полученного списка леммы, которые встречаются на слишком большом количестве страниц.
     //Процент от общего кол-ва страниц конкретного сайта:
     private final int PROCPAGES = 70;
@@ -27,6 +26,14 @@ public class SearchServiceImpl implements SearchService {
     private final float EPS = 0.00001f;
     private final IndexingServiceImpl indexingService;
     private final SitesList sites;
+    private final LemmaFinder lemmaFinderRus, lemmaFinderEng;
+
+    public SearchServiceImpl(IndexingServiceImpl indexingService, SitesList sites) throws IOException {
+        this.indexingService = indexingService;
+        this.sites = sites;
+        lemmaFinderRus = LemmaFinder.getInstanceRus();
+        lemmaFinderEng = LemmaFinder.getInstanceEng();
+    }
 
     public SearchResponse setSearchError(String err) {
         SearchResponse response = new SearchResponse();
@@ -50,15 +57,16 @@ public class SearchServiceImpl implements SearchService {
         return "";
     }
 
-    public LinkedHashMap<String, Integer> sortedLemmaFreqMapForming(LemmaFinder lemmaFinder, String query, int sId) {
+    public LinkedHashMap<String, Integer> sortedLemmaFreqMapForming(String query, int sId) {
         //Разбивать поисковый запрос на отдельные слова и формировать из этих слов список уникальных лемм,
         //исключая междометия, союзы, предлоги и частицы.
-        Map<String, Integer> lemmaFreqMap = new HashMap<>(lemmaFinder.collectLemmas(query));
+        Map<String, Integer> lemmaFreqMap = new HashMap<>(lemmaFinderRus.collectLemmas(query, Language.RUS));
+        Map<String, Integer> lemmaFreqMapEng = new HashMap<>(lemmaFinderEng.collectLemmas(query, Language.ENG));
+        lemmaFreqMap.putAll(lemmaFreqMapEng);
         int cntPgs = 0; //количество страниц, на которых леммы встречаются хотя бы один раз
         Iterator<Map.Entry<String, Integer>> iterator01 = lemmaFreqMap.entrySet().iterator();
         while (iterator01.hasNext()) {
             Map.Entry<String, Integer> entry = iterator01.next();
-            System.out.println(entry.getKey() + "     " + entry.getValue());
             int cntFreqLemma = indexingService.getLemmaFreqByLemmaSiteId(entry.getKey(), sId);
             if (cntFreqLemma != 0) {
                 cntPgs += cntFreqLemma;
@@ -83,7 +91,7 @@ public class SearchServiceImpl implements SearchService {
         //Сортировать леммы в порядке увеличения частоты встречаемости (по возрастанию значения поля frequency)
         // — от самых редких до самых частых.
         //Sorting hashmap by value
-        LinkedHashMap<String, Integer> sortedLemmaFreqMap = lemmaFreqMap.entrySet()
+        return lemmaFreqMap.entrySet()
                 .stream()
                 .sorted(Map.Entry.comparingByValue())
                 .collect(Collectors
@@ -91,8 +99,6 @@ public class SearchServiceImpl implements SearchService {
                                 Map.Entry::getValue,
                                 (e1, e2) -> e1,
                                 LinkedHashMap::new));
-
-        return sortedLemmaFreqMap;
     }
 
     public LinkedHashMap<Integer, Float> sortedDescPageIdRankRelForming(int sId, LinkedHashMap<String, Integer> sortedLemmaFreqMap) {
@@ -102,48 +108,42 @@ public class SearchServiceImpl implements SearchService {
         //Список страниц при этом на каждой итерации должен уменьшаться.
         List<Integer> pageIds = indexingService.getPageBySiteId(sId);
         for (Map.Entry<String, Integer> entry : sortedLemmaFreqMap.entrySet()) {
-            System.out.println(entry.getKey() + "     " + entry.getValue());
             int lemmaId = indexingService.getLemmaId(entry.getKey(), sId);
-            Iterator<Integer> itr = pageIds.iterator();
-            while (itr.hasNext()) {
-                int pageId = itr.next();
-                if (indexingService.getIndexRank(pageId, lemmaId) <= EPS) {
-                    itr.remove();
-                }
+            pageIds = indexingService.getIndexPageIdByLemmaIdPageIds(lemmaId, pageIds);
+            if (pageIds.isEmpty()) {
+                return null;
             }
         }
         //pageIds все страницы с леммами поиска
-
-        if (pageIds.isEmpty()) {
-            return null;
-        }
 
         //Для каждой страницы рассчитывать абсолютную релевантность —
         //сумму всех rank всех найденных на странице лемм (из таблицы index),
         //которая делится на максимальное значение этой абсолютной релевантности
         //для всех найденных страниц.
+        List<String> lemmas = new ArrayList<>();
+        for (Map.Entry<String, Integer> entry : sortedLemmaFreqMap.entrySet()) {
+            lemmas.add(entry.getKey());
+        }
+        List<Integer> lemmaIds = indexingService.getLemmaIdsByLemmasSiteId(lemmas, sId);
+        if (lemmaIds.isEmpty()) {
+            return null;
+        }
         LinkedHashMap<Integer, Float> pageIdRankRel = new LinkedHashMap<>();
         float maxRel = EPS;
         for (int pageId : pageIds) {
-            float rankAbs = 0;
-            for (Map.Entry<String, Integer> entry : sortedLemmaFreqMap.entrySet()) {
-                System.out.println(entry.getKey() + "     " + entry.getValue());
-                int lemmaId = indexingService.getLemmaId(entry.getKey(), sId);
-                rankAbs += indexingService.getIndexRank(pageId, lemmaId);
-            } //for map
+            float rankAbs = indexingService.getIndexSumRank(pageId, lemmaIds);
             pageIdRankRel.put(pageId, rankAbs);
             if ((maxRel - rankAbs) < EPS) {
                 maxRel = rankAbs;
             }
         } //for pageId
         for (Map.Entry<Integer, Float> entry : pageIdRankRel.entrySet()) {
-            System.out.println(entry.getKey() + "     " + entry.getValue());
             pageIdRankRel.put(entry.getKey(), entry.getValue() / maxRel);
         }
         //pageIdRankRel - pageId,Относительная релевантность
 
         //Сортировать страницы по убыванию релевантности (от большей к меньшей).
-        LinkedHashMap<Integer, Float> sortedDescPageIdRankRel = pageIdRankRel.entrySet()
+        return pageIdRankRel.entrySet()
                 .stream()
                 .sorted(Collections.reverseOrder(Map.Entry.comparingByValue()))
                 .collect(Collectors
@@ -151,8 +151,6 @@ public class SearchServiceImpl implements SearchService {
                                 Map.Entry::getValue,
                                 (e1, e2) -> e1,
                                 LinkedHashMap::new));
-
-        return sortedDescPageIdRankRel;
     }
 
     public String getTitle(String content) {
@@ -171,18 +169,26 @@ public class SearchServiceImpl implements SearchService {
         return title;
     }
 
-    public String getSnippet(LemmaFinder lemmaFinder, String content, String query) {
+    public String getSnippet(String content, String query) {
         //set snippet
-        String noHtml = lemmaFinder.clearHtmlTags(content).toLowerCase(Locale.ROOT);
+        String noHtml = lemmaFinderRus.clearHtmlTags(content);
         String snippet = "";
-        String[] words = lemmaFinder.arrayContainsRussianWords(query);
+        String[] words = lemmaFinderRus.arrayContainsAnyWords(query);
         for (String word : words) {
-            if (lemmaFinder.isParticle(word)) {
-                continue; //Это предлог
+            if (word.replaceAll("([^а-я\\s])", " ").trim().isEmpty()) {
+                // english
+                if (lemmaFinderEng.isParticle(word)) {
+                    continue;
+                }
+            } else {
+                // russian
+                if (lemmaFinderRus.isParticle(word)) {
+                    continue;
+                }
             }
             int pos = noHtml.indexOf(word);
             if (pos != -1) { //found
-                int b = 0, e = 0;
+                int b, e;
                 if (pos - SNIPPETSYMBOLSCOUNT <= 0) {
                     b = pos;
                 } else {
@@ -200,13 +206,12 @@ public class SearchServiceImpl implements SearchService {
                 int bSubNoHtml, eSubNoHtml;
                 bSubNoHtml = subNoHtml.indexOf(word);
                 eSubNoHtml = bSubNoHtml + word.length();
+                String str = subNoHtml.substring(eSubNoHtml, subNoHtml.length() - 1);
                 if (bSubNoHtml == 0) {
-                    snippet = snippet.concat("<b>").concat(word).concat("</b>")
-                            .concat(subNoHtml.substring(eSubNoHtml, subNoHtml.length() - 1));
+                    snippet = snippet.concat("<b>").concat(word).concat("</b>").concat(str);
                 } else {
                     snippet = snippet.concat(subNoHtml.substring(0, bSubNoHtml)).concat("<b>")
-                            .concat(word).concat("</b>")
-                            .concat(subNoHtml.substring(eSubNoHtml, subNoHtml.length() - 1));
+                            .concat(word).concat("</b>").concat(str);
                 }
             } //found
         } //for
@@ -221,13 +226,6 @@ public class SearchServiceImpl implements SearchService {
             return setSearchError(resParamVerify);
         }
 
-        LemmaFinder lemmaFinder = null;
-        try {
-            lemmaFinder = LemmaFinder.getInstance();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-
         List<DataSearchItem> data = new ArrayList<>();
         int count = 0;
         url = url.toLowerCase(Locale.ROOT);
@@ -240,7 +238,7 @@ public class SearchServiceImpl implements SearchService {
                 continue;
             }
 
-            LinkedHashMap<String, Integer> sortedLemmaFreqMap = sortedLemmaFreqMapForming(lemmaFinder, query, sId);
+            LinkedHashMap<String, Integer> sortedLemmaFreqMap = sortedLemmaFreqMapForming(query, sId);
             if (sortedLemmaFreqMap == null) {
                 continue;
             }
@@ -252,17 +250,20 @@ public class SearchServiceImpl implements SearchService {
 
             count += sortedDescPageIdRankRel.size();
             //Data forming
+            String content, snippet;
             for (Map.Entry<Integer, Float> entry : sortedDescPageIdRankRel.entrySet()) {
-                System.out.println(entry.getKey() + "     " + entry.getValue());
+                content = indexingService.getPageContent(entry.getKey(), sId);
+                snippet = getSnippet(content, query);
+                if (snippet.isEmpty()) {
+                    continue;
+                }
                 DataSearchItem item = new DataSearchItem();
                 item.setSite(site.getUrl());
                 item.setSiteName(site.getName());
                 item.setRelevance(entry.getValue());
                 item.setUri(indexingService.getPagePath(entry.getKey(), sId));
-
-                String content = indexingService.getPageContent(entry.getKey(), sId);
                 item.setTitle(getTitle(content));
-                item.setSnippet(getSnippet(lemmaFinder, content, query));
+                item.setSnippet(snippet);
 
                 data.add(item);
             } //for data

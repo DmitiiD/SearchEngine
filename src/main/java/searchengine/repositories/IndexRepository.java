@@ -19,6 +19,12 @@ public interface IndexRepository extends JpaRepository<Index, Long> {
     @Query(value = "SELECT * from `index` where page_id = :pageId and lemma_id = :lemmaId", nativeQuery = true)
     List<Index> findAllContains(@Param("pageId") int pageId, @Param("lemmaId") int lemmaId);
 
+    @Query(value = "SELECT page_id from `index` where lemma_id = :lemmaId and `rank` > 0 and page_id in (:pageIds)", nativeQuery = true)
+    List<Integer> findAllPages(@Param("lemmaId") int lemmaId, @Param("pageIds") List<Integer> pageIds);
+
+    @Query(value = "SELECT sum(`rank`) from `index` where page_id = :pageId and lemma_id in (:lemmaIds)", nativeQuery = true)
+    float getIndexSumRank(@Param("pageId") int pageId, @Param("lemmaIds") List<Integer> lemmaIds);
+
     @Modifying
     @Query(value = "DELETE from `index` where page_id = :pageId", nativeQuery = true)
     @Transactional
