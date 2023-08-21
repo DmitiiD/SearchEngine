@@ -320,6 +320,21 @@ public class IndexingServiceImpl implements IndexingService {
         return indexRepository.getIndexSumRank(pageId, lemmaIds);
     }
 
+    public void clearTables() {
+        for (searchengine.config.Site site : sites.getSites()) {
+            int sId = getSiteId(site.getUrl(), site.getName());
+            if (sId != NOTFOUND) {
+                deleteLemmaBySiteId(sId); //lemma clearing
+                List<Integer> pageIds = getPageBySiteId(sId);
+                for (int pageId : pageIds) {
+                    deleteIndexByPageId(pageId); //index table clearing
+                }
+                deletePageBySiteId(sId); //page clearing
+                deleteSiteById(sId); //site clearing
+            }
+        }
+    }
+
     @Override
     public IndexingResponse startIndexing() {
         String[] errors = {
@@ -338,19 +353,8 @@ public class IndexingServiceImpl implements IndexingService {
 
         indexingPools.clear();
 
-        // Удалить все имеющиеся данные по сайтам (записи из таблиц site,page,lemma,_index):
-        for (searchengine.config.Site site : sites.getSites()) {
-            int sId = getSiteId(site.getUrl(), site.getName());
-            if (sId != NOTFOUND) {
-                deleteLemmaBySiteId(sId); //lemma clearing
-                List<Integer> pageIds = getPageBySiteId(sId);
-                for (int pageId : pageIds) {
-                    deleteIndexByPageId(pageId); //index table clearing
-                }
-                deletePageBySiteId(sId); //page clearing
-                deleteSiteById(sId); //site clearing
-            }
-        }
+        // Удалить все имеющиеся данные по сайтам (записи из таблиц site,page,lemma,index):
+        clearTables();
 
         // Создать в таблице site новые записи со статусом INDEXING:
         for (searchengine.config.Site site : sites.getSites()) {
