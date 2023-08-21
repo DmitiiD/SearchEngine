@@ -475,10 +475,8 @@ public class IndexingServiceImpl implements IndexingService {
             }
         }
         // Is url from site list ?
-        if (siteFnd.isEmpty()) {
-            return setIndexingResult(false, "Данная страница находится за пределами сайтов, указанных в конфигурационном файле");
-        }
-        if (removeLastSymbol(url, '/').toLowerCase(Locale.ROOT).equals(removeLastSymbol(siteFnd, '/').toLowerCase(Locale.ROOT))) {
+        if (siteFnd.isEmpty() ||
+                removeLastSymbol(url, '/').toLowerCase(Locale.ROOT).equals(removeLastSymbol(siteFnd, '/').toLowerCase(Locale.ROOT))) {
             return setIndexingResult(false, "Данная страница находится за пределами сайтов, указанных в конфигурационном файле");
         }
 
