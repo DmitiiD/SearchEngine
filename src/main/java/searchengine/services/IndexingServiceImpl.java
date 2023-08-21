@@ -335,20 +335,19 @@ public class IndexingServiceImpl implements IndexingService {
         }
     }
 
+    public IndexingResponse setIndexingResult(boolean flag, String err) {
+        IndexingResponse response = new IndexingResponse();
+        response.setResult(flag);
+        response.setError(err);
+        return response;
+    }
+
+
     @Override
     public IndexingResponse startIndexing() {
-        String[] errors = {
-                "Индексация уже запущена",
-                "Индексация не запущена",
-                ""
-        };
-
         // Если хоть у одного сайта статус INDEXING, то считаем, что полная УЖЕ индексация запущена
         if (getSiteStatusCount(Status.INDEXING) > 0) {
-            IndexingResponse response = new IndexingResponse();
-            response.setResult(false);
-            response.setError(errors[0]); //"Индексация уже запущена"
-            return response;
+            return setIndexingResult(false, "Индексация уже запущена");
         }
 
         indexingPools.clear();
@@ -389,27 +388,14 @@ public class IndexingServiceImpl implements IndexingService {
 
         } // for
 
-        IndexingResponse response = new IndexingResponse();
-        response.setResult(true);
-        response.setError(errors[2]); //""
-        return response;
+        return setIndexingResult(true, "");
     }
 
     @Override
     public IndexingResponse stopIndexing() {
-        String[] errors = {
-                "Индексация уже запущена",
-                "Индексация не запущена",
-                "",
-                "Ошибка остановки индексации"
-        };
-
         // Если статус всех сайтов отличается от INDEXING, то считаем, что индексация НЕ запущена
         if (getSiteStatusCount(Status.INDEXING) == 0) {
-            IndexingResponse response = new IndexingResponse();
-            response.setResult(false);
-            response.setError(errors[1]); //"Индексация не запущена"
-            return response;
+            return setIndexingResult(false, "Индексация не запущена");
         }
 
         if (indexingPools.size() != getSiteStatusCount(Status.INDEXING)) {
@@ -420,10 +406,7 @@ public class IndexingServiceImpl implements IndexingService {
                 ex.printStackTrace();
             }
             if (indexingPools.size() != getSiteStatusCount(Status.INDEXING)) {
-                IndexingResponse response = new IndexingResponse();
-                response.setResult(false);
-                response.setError(errors[3]); //"Ошибка остановки индексации"
-                return response;
+                return setIndexingResult(false, "Ошибка остановки индексации");
             }
         }
 
@@ -467,28 +450,16 @@ public class IndexingServiceImpl implements IndexingService {
             }
         } //while
 
-        IndexingResponse response = new IndexingResponse();
         if (i == 0) { // all pools have been successfully terminated
             indexingPools.clear();
-            response.setResult(true);
-            response.setError(errors[2]); //""
+            return setIndexingResult(true, "");
         } else {
-            response.setResult(false);
-            response.setError(errors[3]); //"Ошибка остановки индексации"
+            return setIndexingResult(false, "Ошибка остановки индексации");
         }
-
-        return response;
     }
 
     @Override
     public IndexingResponse indexPage(String url) {
-        String[] errors = {
-                "Данная страница находится за пределами сайтов, указанных в конфигурационном файле",
-                "",
-                "Ошибка работы с леммами"
-        };
-        IndexingResponse response = new IndexingResponse();
-
         String siteFnd = "";
         int sId = NOTFOUND;
         for (searchengine.config.Site site : sites.getSites()) {
@@ -505,14 +476,10 @@ public class IndexingServiceImpl implements IndexingService {
         }
         // Is url from site list ?
         if (siteFnd.isEmpty()) {
-            response.setResult(false);
-            response.setError(errors[0]); //"Данная страница находится за пределами сайтов, указанных в конфигурационном файле"
-            return response;
+            return setIndexingResult(false, "Данная страница находится за пределами сайтов, указанных в конфигурационном файле");
         }
         if (removeLastSymbol(url, '/').toLowerCase(Locale.ROOT).equals(removeLastSymbol(siteFnd, '/').toLowerCase(Locale.ROOT))) {
-            response.setResult(false);
-            response.setError(errors[0]); //"Данная страница находится за пределами сайтов, указанных в конфигурационном файле"
-            return response;
+            return setIndexingResult(false, "Данная страница находится за пределами сайтов, указанных в конфигурационном файле");
         }
 
         // Get name of page:
@@ -523,14 +490,10 @@ public class IndexingServiceImpl implements IndexingService {
 
         if (!indexPageTreatment(url, sId, pageUrl)) {
             //error
-            response.setResult(false);
-            response.setError(errors[2]); //"Ошибка работы с леммами"
-            return response;
+            return setIndexingResult(false, "Ошибка работы с леммами");
         }
 
-        response.setResult(true);
-        response.setError(errors[1]); //""
-        return response;
+        return setIndexingResult(true, "");
     }
 
     public boolean indexPageTreatment(String url, int siteId, String pageUrl/*page.path*/) {
