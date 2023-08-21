@@ -133,7 +133,7 @@ public class IndexingServiceImpl implements IndexingService {
         for (Site site : siteList) {
             return site.getUrl();
         }
-        return "url not found";
+        return null;
     }
 
     @Override
@@ -183,7 +183,7 @@ public class IndexingServiceImpl implements IndexingService {
         for (Site site : siteList) {
             return site.getLastError();
         }
-        return "Not found";
+        return null;
     }
 
     @Override

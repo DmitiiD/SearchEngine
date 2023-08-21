@@ -62,8 +62,8 @@ public class StatisticsServiceImpl implements StatisticsService {
             item.setUrl(site.getUrl());
 
             int sId = indexingService.getSiteId(site.getUrl(), site.getName());
-            int pages = indexingService.getPageCountBySiteId(sId); //random.nextInt(1_000);
-            int lemmas = indexingService.getLemmaCountBySiteId(sId); //pages * random.nextInt(1_000);
+            int pages = indexingService.getPageCountBySiteId(sId);
+            int lemmas = indexingService.getLemmaCountBySiteId(sId);
             item.setPages(pages);
             item.setLemmas(lemmas);
             Status stat = indexingService.getSiteStatus(sId);
@@ -81,7 +81,7 @@ public class StatisticsServiceImpl implements StatisticsService {
             LocalDateTime localDateTime = indexingService.getSiteStatusTimeBySiteId(sId);
             ZonedDateTime zdt = ZonedDateTime.of(localDateTime, ZoneId.systemDefault());
             long date = zdt.toInstant().toEpochMilli();
-            item.setStatusTime(date); //System.currentTimeMillis() - (random.nextInt(10_000)));
+            item.setStatusTime(date);
 
             total.setPages(total.getPages() + pages);
             total.setLemmas(total.getLemmas() + lemmas);

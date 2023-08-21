@@ -60,7 +60,7 @@ public class ForkJoinParser extends RecursiveTask<Set<String>> {
             System.out.println("Error getPageResponse() for " + url);
         } else {
             String strTmp = removeLastSymbol(idxService.getSiteUrl(siteId), '/');
-            String path = url.substring(strTmp.length());
+            String path = strTmp == null ? "" : url.substring(strTmp.length());
             if (path.isEmpty()) {
                 path = "/"; // адрес страницы от корня сайта (должен начинаться со слэша, например: /news/372189/)
             }
