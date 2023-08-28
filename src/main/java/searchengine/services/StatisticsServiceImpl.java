@@ -2,6 +2,7 @@ package searchengine.services;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import searchengine.config.Messages;
 import searchengine.config.Site;
 import searchengine.config.SitesList;
 import searchengine.dto.statistics.DetailedStatisticsItem;
@@ -9,6 +10,9 @@ import searchengine.dto.statistics.StatisticsData;
 import searchengine.dto.statistics.StatisticsResponse;
 import searchengine.dto.statistics.TotalStatistics;
 import searchengine.model.Status;
+import searchengine.repositories.LemmaRepository;
+import searchengine.repositories.PageRepository;
+import searchengine.repositories.SiteRepository;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -20,11 +24,17 @@ import java.util.*;
 public class StatisticsServiceImpl implements StatisticsService {
     private final SitesList sites;
     private final IndexingServiceImpl indexingService;
+    private final SiteRepository siteRepository;
+    private final PageRepository pageRepository;
+    private final LemmaRepository lemmaRepository;
 
     @Override
     public StatisticsResponse getStatistics() {
-        // Db actualization sites from config:
-        HashMap<String, String> sitesUrlNameDb = new HashMap<>(indexingService.getSitesList());
+        HashMap<String, String> sitesUrlNameDb = new HashMap<>();
+        for (searchengine.model.Site site : siteRepository.findAllSites()) {
+            sitesUrlNameDb.put(site.getName(), site.getUrl());
+        }
+
         for (Site site : sites.getSites()) {
             String name = site.getName().toLowerCase(Locale.ROOT);
             String url = site.getUrl().toLowerCase(Locale.ROOT);
@@ -36,11 +46,15 @@ public class StatisticsServiceImpl implements StatisticsService {
                 }
             }
             if (!isFind) {
-                indexingService.insertSite(url, name, Status.FAILED);
+                siteRepository.insert(url.toLowerCase(), name.toLowerCase(), Status.FAILED.toString(), LocalDateTime.now());
             }
-        }// for
+        }
 
-        HashMap<String, String> sitesCfgDb = new HashMap<>(indexingService.getSitesList()); //name, url
+        HashMap<String, String> sitesCfgDb = new HashMap<>();
+        for (searchengine.model.Site site : siteRepository.findAllSites()) {
+            sitesCfgDb.put(site.getName(), site.getUrl());
+        }
+
         HashSet<Site> sitesActual = new HashSet<>();
         for (Map.Entry<String, String> sitesAct : sitesCfgDb.entrySet()) {
             Site st = new Site();
@@ -61,24 +75,24 @@ public class StatisticsServiceImpl implements StatisticsService {
             item.setName(site.getName());
             item.setUrl(site.getUrl());
 
-            int sId = indexingService.getSiteId(site.getUrl(), site.getName());
-            int pages = indexingService.getPageCountBySiteId(sId);
-            int lemmas = indexingService.getLemmaCountBySiteId(sId);
+            int sId = siteRepository.findAllContains(site.getUrl().toLowerCase(), site.getName().toLowerCase()).stream().findFirst().map(searchengine.model.Site::getId).orElse(-1);
+            int pages = pageRepository.calcPageCountBySiteId(sId);
+            int lemmas = lemmaRepository.calcLemmaCountBySiteId(sId);
             item.setPages(pages);
             item.setLemmas(lemmas);
-            Status stat = indexingService.getSiteStatus(sId);
-            item.setStatus(stat.toString()); //statuses[i % 3]);
-            String err = indexingService.getSiteLastErrorBySiteId(sId);
+            Status stat = siteRepository.findAllContains(sId).stream().findFirst().map(searchengine.model.Site::getStatus).orElse(Status.NOTFOUND);
+            item.setStatus(stat.toString());
+            String err = siteRepository.findAllContains(sId).stream().findFirst().map(searchengine.model.Site::getLastError).orElse(null);
             if (err == null) {
                 if (stat == Status.FAILED) {
-                    err = "Страница не проиндексирована";
+                    err = Messages.noIndexedSite;
                 } else {
-                    err = "Без ошибок";
+                    err = Messages.noErrors;
                 }
             }
             item.setError(err);
 
-            LocalDateTime localDateTime = indexingService.getSiteStatusTimeBySiteId(sId);
+            LocalDateTime localDateTime = siteRepository.findAllContains(sId).stream().findFirst().map(searchengine.model.Site::getStatusTime).orElse(LocalDateTime.now());
             ZonedDateTime zdt = ZonedDateTime.of(localDateTime, ZoneId.systemDefault());
             long date = zdt.toInstant().toEpochMilli();
             item.setStatusTime(date);

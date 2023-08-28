@@ -10,4 +10,6 @@ public class SearchResponse {
     private int count;
     private List<DataSearchItem> data;
     private String error;
+    private int offset;
+    private int limit;
 }

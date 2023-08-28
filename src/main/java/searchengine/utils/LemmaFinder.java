@@ -33,12 +33,6 @@ public class LemmaFinder {
         throw new RuntimeException("Disallow construct");
     }
 
-    /**
-     * Метод разделяет текст на слова, находит все леммы и считает их количество.
-     *
-     * @param text текст из которого будут выбираться леммы
-     * @return ключ является леммой, а значение количеством найденных лемм
-     */
     public Map<String, Integer> collectLemmas(String text, Language language) {
         String[] words;
         char tmp;
@@ -79,18 +73,16 @@ public class LemmaFinder {
             } else {
                 lemmas.put(normalWord, 1);
             }
-        } //for
+        }
 
         return lemmas;
     }
 
-    // предлоги или нет. Если да - true
     public boolean isParticle(String word) {
         List<String> wordBaseForms = luceneMorphology.getMorphInfo(word);
         return anyWordBaseBelongToParticle(wordBaseForms);
     }
 
-    // Очистка кода веб-страниц от HTML-тегов
     public String clearHtmlTags(String text) {
         return text.toLowerCase(Locale.ROOT)
                 .replaceAll("<[^>]+>", "")

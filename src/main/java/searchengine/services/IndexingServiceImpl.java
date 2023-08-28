@@ -2,6 +2,7 @@ package searchengine.services;
 
 import lombok.Getter;
 import org.springframework.stereotype.Service;
+import searchengine.config.Messages;
 import searchengine.config.Options;
 import searchengine.config.SitesList;
 import searchengine.dto.statistics.IndexingResponse;
@@ -52,285 +53,16 @@ public class IndexingServiceImpl implements IndexingService {
         lemmaFinderEng = LemmaFinder.getInstanceEng();
     }
 
-    @Override
-    public void updateIndexRank(int pageId, int lemmaId, float rank) {
-        indexRepository.updateRank(pageId, lemmaId, rank);
-    }
-
-    @Override
-    public void updateLemmaFrequency(int lemmaId, int frequency) {
-        lemmaRepository.updateFrequency(lemmaId, frequency);
-    }
-
-    @Override
-    public void updateSiteLastError(int id, String lastError) {
-        siteRepository.updateLastError(id, lastError.toLowerCase());
-    }
-
-    @Override
-    public void updateSiteStatus(int id, Status status) {
-        siteRepository.updateStatus(id, status.toString());
-    }
-
-    @Override
-    public void updateSiteCurrentStatusTime(int id) {
-        siteRepository.updateStatusTime(id, LocalDateTime.now());
-    }
-
-    @Override
-    public void insertLemma(int siteId, String lemma, int frequency) {
-        lemmaRepository.insert(siteId, lemma.toLowerCase(), frequency);
-    }
-
-    @Override
-    public void insertIndex(int pageId, int lemmaId, float rank) {
-        indexRepository.insert(pageId, lemmaId, rank);
-    }
-
-    @Override
-    public void insertPage(int siteId, String path, int code, String content) {
-        pageRepository.insert(siteId, path.toLowerCase(), code, content);
-    }
-
-    @Override
-    public void insertSite(String url, String name, Status status) {
-        siteRepository.insert(url.toLowerCase(), name.toLowerCase(), status.toString(), LocalDateTime.now());
-    }
-
-    @Override
-    public void deleteSiteById(int id) {
-        siteRepository.deleteById(id);
-    }
-
-    @Override
-    public void deleteLemmaById(int id) {
-        lemmaRepository.deleteById(id);
-    }
-
-    @Override
-    public void deleteLemmaBySiteId(int siteId) {
-        lemmaRepository.deleteBySiteId(siteId);
-    }
-
-    @Override
-    public void deletePageBySiteId(int siteId) {
-        pageRepository.deleteBySiteId(siteId);
-    }
-
-    @Override
-    public void deletePageById(int id) {
-        pageRepository.deleteById(id);
-    }
-
-    @Override
-    public void deleteIndexByPageId(int pageId) {
-        indexRepository.deleteByPageId(pageId);
-    }
-
-    @Override
-    public String getSiteUrl(int sId) {
-        List<Site> siteList = siteRepository.findAllContains(sId);
-        for (Site site : siteList) {
-            return site.getUrl();
-        }
-        return null;
-    }
-
-    @Override
-    public Status getSiteStatus(int sId) {
-        List<Site> siteList = siteRepository.findAllContains(sId);
-        for (Site site : siteList) {
-            return site.getStatus();
-        }
-        return Status.NOTFOUND;
-    }
-
-    @Override
-    public int getSiteId(String url, String name) {
-        List<Site> siteList = siteRepository.findAllContains(url.toLowerCase(), name.toLowerCase());
-        for (Site site : siteList) {
-            return site.getId();
-        }
-        return NOTFOUND;
-    }
-
-    @Override
-    public Status getSiteStatus(String url, String name) {
-        List<Site> siteList = siteRepository.findAllContains(url.toLowerCase(), name.toLowerCase());
-        for (Site site : siteList) {
-            return site.getStatus();
-        }
-        return Status.NOTFOUND;
-    }
-
-    @Override
-    public Status getSiteStatusByUrl(String url) {
-        List<Site> siteList = siteRepository.findAllContainsByUrl(url.toLowerCase());
-        for (Site site : siteList) {
-            return site.getStatus();
-        }
-        return Status.NOTFOUND;
-    }
-
-    @Override
-    public int getSiteStatusCount(Status status) {
-        return siteRepository.getStatusCount(status.toString());
-    }
-
-    @Override
-    public String getSiteLastErrorBySiteId(int siteId) {
-        List<Site> siteList = siteRepository.findAllContains(siteId);
-        for (Site site : siteList) {
-            return site.getLastError();
-        }
-        return null;
-    }
-
-    @Override
-    public LocalDateTime getSiteStatusTimeBySiteId(int siteId) {
-        List<Site> siteList = siteRepository.findAllContains(siteId);
-        for (Site site : siteList) {
-            return site.getStatusTime();
-        }
-        return LocalDateTime.now();
-    }
-
-    @Override
-    public HashMap<String, String> getSitesList() {
-        HashMap<String, String> hM = new HashMap<>();
-        List<Site> siteList = siteRepository.findAllSites();
-
-        for (Site site : siteList) {
-            hM.put(site.getName(), site.getUrl());
-        }
-        return hM;
-    }
-
-    @Override
-    public String getPagePath(int pageId, int siteId) {
-        return pageRepository.getPath(pageId, siteId);
-    }
-
-    @Override
-    public String getPageContent(int pageId, int siteId) {
-        return pageRepository.getContent(pageId, siteId);
-    }
-
-    @Override
-    public int getPageId(String path, int siteId) {
-        List<Page> pageList = pageRepository.findAllContains(path.toLowerCase(), siteId);
-        for (Page page : pageList) {
-            return page.getId();
-        }
-        return NOTFOUND;
-    }
-
-    @Override
-    public int getPageCountBySiteId(int siteId) {
-        return pageRepository.calcPageCountBySiteId(siteId);
-    }
-
-    @Override
-    public List<Integer> getPageBySiteId(int siteId) {
-        List<Page> pageList = pageRepository.findAllContains(siteId);
-        List<Integer> pageIds = new ArrayList<>();
-        for (Page page : pageList) {
-            pageIds.add(page.getId());
-        }
-        return pageIds;
-    }
-
-    @Override
-    public int getLemmaId(String lemma, int siteId) {
-        List<Lemma> lemmaList = lemmaRepository.findAllContains(lemma.toLowerCase(), siteId);
-        for (Lemma lemmaTable : lemmaList) {
-            return lemmaTable.getId();
-        }
-        return NOTFOUND;
-    }
-
-    @Override
-    public int getLemmaCountBySiteId(int siteId) {
-        return lemmaRepository.calcLemmaCountBySiteId(siteId);
-    }
-
-    @Override
-    public int getLemmaFrequency(int lemmaId) {
-        List<Lemma> lemmaList = lemmaRepository.findAllContainsByLemmaId(lemmaId);
-        for (Lemma lemma : lemmaList) {
-            return lemma.getFrequency();
-        }
-        return NOTFOUND;
-    }
-
-    @Override
-    public int getLemmaCountByLemmaSiteId(String lemma, int siteId) {
-        return lemmaRepository.calcLemmaCountByLemmaSiteId(lemma.toLowerCase(Locale.ROOT), siteId);
-    }
-
-    @Override
-    public int getLemmaFreqByLemmaSiteId(String lemma, int siteId) {
-        if (getLemmaCountByLemmaSiteId(lemma.toLowerCase(Locale.ROOT), siteId) == 0) {
-            return 0;
-        }
-        return lemmaRepository.getLemmaFrequency(lemma.toLowerCase(Locale.ROOT), siteId);
-    }
-
-    @Override
-    public List<Integer> getLemmaIdBySiteId(int siteId) {
-        List<Lemma> lemmaList = lemmaRepository.findAllContainsBySiteId(siteId);
-        List<Integer> lemmaIds = new ArrayList<>();
-        for (Lemma lemma : lemmaList) {
-            lemmaIds.add(lemma.getId());
-        }
-        return lemmaIds;
-    }
-
-    @Override
-    public List<Integer> getLemmaIdsByLemmasSiteId(List<String> lemmas, int sId) {
-        return lemmaRepository.findAllContainsByLemmasSiteId(lemmas, sId);
-    }
-
-    @Override
-    public List<Integer> getIndexLemmaId(int pageId) {
-        List<Index> indexList = indexRepository.findAllContains(pageId);
-        List<Integer> lemmaIds = new ArrayList<>();
-        for (Index index : indexList) {
-            lemmaIds.add(index.getLemmaId());
-        }
-        return lemmaIds;
-    }
-
-    @Override
-    public float getIndexRank(int pageId, int lemmaId) {
-        List<Index> indexList = indexRepository.findAllContains(pageId, lemmaId);
-        for (Index index : indexList) {
-            return index.getRank();
-        }
-        return 0;
-    }
-
-    @Override
-    public List<Integer> getIndexPageIdByLemmaIdPageIds(int lemmaId, List<Integer> pageIds) {
-        return indexRepository.findAllPages(lemmaId, pageIds);
-    }
-
-    @Override
-    public float getIndexSumRank(int pageId, List<Integer> lemmaIds) {
-        return indexRepository.getIndexSumRank(pageId, lemmaIds);
-    }
-
     public void clearTables() {
         for (searchengine.config.Site site : sites.getSites()) {
-            int sId = getSiteId(site.getUrl(), site.getName());
+            int sId = siteRepository.findAllContains(site.getUrl().toLowerCase(), site.getName().toLowerCase()).stream().findFirst().map(Site::getId).orElse(NOTFOUND);
             if (sId != NOTFOUND) {
-                deleteLemmaBySiteId(sId); //lemma clearing
-                List<Integer> pageIds = getPageBySiteId(sId);
-                for (int pageId : pageIds) {
-                    deleteIndexByPageId(pageId); //index table clearing
+                lemmaRepository.deleteBySiteId(sId);
+                for (Page page : pageRepository.findAllContains(sId)) {
+                    indexRepository.deleteByPageId(page.getId());
                 }
-                deletePageBySiteId(sId); //page clearing
-                deleteSiteById(sId); //site clearing
+                pageRepository.deleteBySiteId(sId);
+                siteRepository.deleteById(sId);
             }
         }
     }
@@ -342,46 +74,40 @@ public class IndexingServiceImpl implements IndexingService {
         return response;
     }
 
+    public void setSuccessfulIndexStoppingStatus(int siteId) {
+        siteRepository.updateStatus(siteId, Status.FAILED.toString());
+        siteRepository.updateLastError(siteId, Messages.indexingStopped);
+    }
 
     @Override
     public IndexingResponse startIndexing() {
-        // Если хоть у одного сайта статус INDEXING, то считаем, что полная УЖЕ индексация запущена
-        if (getSiteStatusCount(Status.INDEXING) > 0) {
-            return setIndexingResult(false, "Индексация уже запущена");
+        if (siteRepository.getStatusCount(Status.INDEXING.toString()) > 0) {
+            return setIndexingResult(false, Messages.indexingInProgress);
         }
 
         indexingPools.clear();
-
-        // Удалить все имеющиеся данные по сайтам (записи из таблиц site,page,lemma,index):
         clearTables();
 
-        // Создать в таблице site новые записи со статусом INDEXING:
         for (searchengine.config.Site site : sites.getSites()) {
-            insertSite(site.getUrl(), site.getName(), Status.INDEXING);
+            siteRepository.insert(site.getUrl().toLowerCase(), site.getName().toLowerCase(), Status.INDEXING.toString(), LocalDateTime.now());
         }
 
-        // Обойти все страницы, начиная с главной, добавить их адреса, статусы и содержимое в базу данных в таблицу page:
         for (searchengine.config.Site site : sites.getSites()) {
 
-            int sId = getSiteId(site.getUrl(), site.getName());
+            int sId = siteRepository.findAllContains(site.getUrl().toLowerCase(), site.getName().toLowerCase()).stream().findFirst().map(Site::getId).orElse(NOTFOUND);
             if (sId != NOTFOUND) {
-                // Обход каждого из сайтов, перечисленных в конфигурационном файле, должен запускаться в отдельном потоке !!!
                 Thread thread =
                         new Thread(() -> {
-                            // ForkJoinPool process. Waiting ...
-                            ForkJoinParser parserFJ = new ForkJoinParser(site.getUrl(), sId, this);
+                            ForkJoinParser parserFJ = new ForkJoinParser(site.getUrl(), sId, this,
+                                    indexRepository, lemmaRepository, siteRepository, pageRepository);
                             ForkJoinPool pool = new ForkJoinPool();
                             getIndexingPools().put(sId, pool);
                             pool.invoke(parserFJ);
                             List<String> listFJ = new ArrayList<>(parserFJ.join());
-                            //listFJ - pages list
-                            // ForkJoinPool process: the end.
                             System.out.println("Amount indexed pages = " + listFJ.size() + ". Site name = " + site.getName());
 
-                            // В процессе обхода постоянно обновлять дату и время в поле status_time таблицы site на текущее.
-                            // По завершении обхода изменить статус (поле status) на INDEXED:
-                            updateSiteCurrentStatusTime(sId);
-                            updateSiteStatus(sId, Status.INDEXED);
+                            siteRepository.updateStatusTime(sId, LocalDateTime.now());
+                            siteRepository.updateStatus(sId, Status.INDEXED.toString());
                         });
                 thread.start();
             }
@@ -393,68 +119,63 @@ public class IndexingServiceImpl implements IndexingService {
 
     @Override
     public IndexingResponse stopIndexing() {
-        // Если статус всех сайтов отличается от INDEXING, то считаем, что индексация НЕ запущена
-        if (getSiteStatusCount(Status.INDEXING) == 0) {
-            return setIndexingResult(false, "Индексация не запущена");
+        if (siteRepository.getStatusCount(Status.INDEXING.toString()) == 0) {
+            return setIndexingResult(false, Messages.indexingNotInProgress);
         }
 
-        if (indexingPools.size() != getSiteStatusCount(Status.INDEXING)) {
+        if (indexingPools.size() != siteRepository.getStatusCount(Status.INDEXING.toString())) {
             System.out.println("ForkJoinPool not synchronized with count of indexing sites. Waiting 60 seconds ...");
             try {
                 Thread.sleep(60000);
             } catch (InterruptedException ex) {
                 ex.printStackTrace();
             }
-            if (indexingPools.size() != getSiteStatusCount(Status.INDEXING)) {
-                return setIndexingResult(false, "Ошибка остановки индексации");
+            if (indexingPools.size() != siteRepository.getStatusCount(Status.INDEXING.toString())) {
+                return setIndexingResult(false, Messages.indexingStoppingError);
             }
         }
 
-        // Остановить все потоки и записать в базу данных для всех сайтов, страницы которых ещё не удалось обойти,
-        // состояние FAILED и текст ошибки «Индексация остановлена пользователем»:
         Iterator<Map.Entry<Integer, ForkJoinPool>> iterator = indexingPools.entrySet().iterator();
         int i = indexingPools.size();
         while (iterator.hasNext()) {
             Map.Entry<Integer, ForkJoinPool> entry = iterator.next();
-            if (entry.getValue() != null && getSiteStatus(entry.getKey()) == Status.INDEXING) {
+            Status status = Status.NOTFOUND;
+            for (Site site : siteRepository.findAllContains(entry.getKey())) {
+                status = site.getStatus();
+                break;
+            }
+            if (entry.getValue() != null && status == Status.INDEXING) {
                 entry.getValue().shutdown();
 
                 try {
-                    // Wait a while for existing tasks to terminate
                     if (!entry.getValue().awaitTermination(60, TimeUnit.SECONDS)) {
-                        // Cancel currently executing tasks forcefully
                         entry.getValue().shutdownNow();
-                        // Wait a while for tasks to respond to being cancelled
                         if (!entry.getValue().awaitTermination(60, TimeUnit.SECONDS)) {
                             System.err.println("Pool (siteId ==" + entry.getKey() + ") did not terminate");
                         } else {
-                            updateSiteStatus(entry.getKey(), Status.FAILED);
-                            updateSiteLastError(entry.getKey(), "Индексация остановлена пользователем");
+                            setSuccessfulIndexStoppingStatus(entry.getKey());
                             iterator.remove();
                             --i;
                         }
                     } else {
-                        updateSiteStatus(entry.getKey(), Status.FAILED);
-                        updateSiteLastError(entry.getKey(), "Индексация остановлена пользователем");
+                        setSuccessfulIndexStoppingStatus(entry.getKey());
                         iterator.remove();
                         --i;
                     }
                 } catch (InterruptedException ex) {
-                    // (Re-)Cancel if current thread also interrupted
                     entry.getValue().shutdownNow();
-                    // Preserve interrupt status
                     Thread.currentThread().interrupt();
                 }
 
-                updateSiteCurrentStatusTime(entry.getKey());
+                siteRepository.updateStatusTime(entry.getKey(), LocalDateTime.now());
             }
-        } //while
+        }
 
-        if (i == 0) { // all pools have been successfully terminated
+        if (i == 0) {
             indexingPools.clear();
             return setIndexingResult(true, "");
         } else {
-            return setIndexingResult(false, "Ошибка остановки индексации");
+            return setIndexingResult(false, Messages.indexingStoppingError);
         }
     }
 
@@ -465,30 +186,26 @@ public class IndexingServiceImpl implements IndexingService {
         for (searchengine.config.Site site : sites.getSites()) {
             if (url.contains(site.getUrl())) {
                 siteFnd = site.getUrl();
-                sId = getSiteId(site.getUrl(), site.getName());
+                sId = siteRepository.findAllContains(site.getUrl().toLowerCase(), site.getName().toLowerCase()).stream().findFirst().map(Site::getId).orElse(NOTFOUND);
                 if (sId == NOTFOUND) {
-                    //еще не индексировали сайт
-                    insertSite(site.getUrl(), site.getName(), Status.INDEXED);
-                    sId = getSiteId(site.getUrl(), site.getName());
+                    siteRepository.insert(site.getUrl().toLowerCase(), site.getName().toLowerCase(), Status.INDEXED.toString(), LocalDateTime.now());
+                    sId = siteRepository.findAllContains(site.getUrl().toLowerCase(), site.getName().toLowerCase()).stream().findFirst().map(Site::getId).orElse(NOTFOUND);
                 }
                 break;
             }
         }
-        // Is url from site list ?
         if (siteFnd.isEmpty() ||
                 removeLastSymbol(url, '/').toLowerCase(Locale.ROOT).equals(removeLastSymbol(siteFnd, '/').toLowerCase(Locale.ROOT))) {
-            return setIndexingResult(false, "Данная страница находится за пределами сайтов, указанных в конфигурационном файле");
+            return setIndexingResult(false, Messages.indexingPageOutsideSite);
         }
 
-        // Get name of page:
         String pageUrl = url.toLowerCase(Locale.ROOT).replaceAll(siteFnd, "").trim();
         if (pageUrl.charAt(0) != '/') {
             pageUrl = "/".concat(pageUrl);
         }
 
         if (!indexPageTreatment(url, sId, pageUrl)) {
-            //error
-            return setIndexingResult(false, "Ошибка работы с леммами");
+            return setIndexingResult(false, Messages.workingLemmaError);
         }
 
         return setIndexingResult(true, "");
@@ -496,29 +213,37 @@ public class IndexingServiceImpl implements IndexingService {
 
     public boolean indexPageTreatment(String url, int siteId, String pageUrl/*page.path*/) {
         Document doc;
-        int pageId;
+        int pageId = NOTFOUND;
 
-        pageId = getPageId(pageUrl, siteId);
+        for (Page page : pageRepository.findAllContains(pageUrl.toLowerCase(), siteId)) {
+            pageId = page.getId();
+            break;
+        }
         if (pageId != NOTFOUND) {
-            //переданная страница уже была проиндексирована => перед её индексацией необходимо
-            //удалить всю информацию о ней из таблиц page, lemma и index
-            List<Integer> lemmaIds = getIndexLemmaId(pageId);
-            deleteIndexByPageId(pageId); //index table clearing
+            List<Integer> lemmaIds = new ArrayList<>();
+            for (Index index : indexRepository.findAllContains(pageId)) {
+                lemmaIds.add(index.getLemmaId());
+            }
+            indexRepository.deleteByPageId(pageId); //index table clearing
             for (int lemmaId : lemmaIds) {
-                int freq = getLemmaFrequency(lemmaId);
+                int freq = NOTFOUND;
+                for (Lemma lemma : lemmaRepository.findAllContainsByLemmaId(lemmaId)) {
+                    freq = lemma.getFrequency();
+                    break;
+                }
                 if (freq == 1) {
-                    // delete record from lemma table due to frequency can not be null
-                    deleteLemmaById(lemmaId); //lemma table clearing
+                    lemmaRepository.deleteById(lemmaId); //lemma table clearing
                 } else {
-                    // set frequency = freq - 1
-                    updateLemmaFrequency(lemmaId, freq - 1); //lemma table
+                    if (freq != NOTFOUND) {
+                        lemmaRepository.updateFrequency(lemmaId, freq - 1);
+                    }
                 }
             }
-            deletePageById(pageId);
-        } //page found
+            pageRepository.deleteById(pageId);
+        }
 
         url = removeLastSymbol(url, '/').toLowerCase();
-        updateSiteCurrentStatusTime(siteId);
+        siteRepository.updateStatusTime(siteId, LocalDateTime.now());
 
         Response response = getPageResponse(url);
         if (response == null) {
@@ -531,7 +256,10 @@ public class IndexingServiceImpl implements IndexingService {
                 return false;
             }
         }
-        pageId = getPageId(pageUrl, siteId);
+        for (Page page : pageRepository.findAllContains(pageUrl.toLowerCase(), siteId)) {
+            pageId = page.getId();
+            break;
+        }
         String text = doc.outerHtml();
 
         Map<String, Integer> lemmas = new HashMap<>(lemmaFinderRus.collectLemmas(text, Language.RUS));
@@ -539,21 +267,30 @@ public class IndexingServiceImpl implements IndexingService {
         lemmas.putAll(lemmasEng);
 
         for (Map.Entry<String, Integer> entry : lemmas.entrySet()) {
-            // lemma insert/update
-            int lId = getLemmaId(entry.getKey(), siteId);
-            if (lId == NOTFOUND) {
-                insertLemma(siteId, entry.getKey(), 1);
-                lId = getLemmaId(entry.getKey(), siteId);
+            int lId = NOTFOUND;
+            for (Lemma lemmaTable : lemmaRepository.findAllContains(entry.getKey().toLowerCase(), siteId)) {
+                lId = lemmaTable.getId();
+                break;
             }
-            // index insert/update
-            float rank = getIndexRank(pageId, lId);
+            if (lId == NOTFOUND) {
+                lemmaRepository.insert(siteId, entry.getKey().toLowerCase(), 1);
+                for (Lemma lemmaTable : lemmaRepository.findAllContains(entry.getKey().toLowerCase(), siteId)) {
+                    lId = lemmaTable.getId();
+                    break;
+                }
+            }
+            float rank = 0;
+            for (Index index : indexRepository.findAllContains(pageId, lId)) {
+                rank = index.getRank();
+                break;
+            }
             if (rank <= EPS) {
-                insertIndex(pageId, lId, entry.getValue());
+                indexRepository.insert(pageId, lId, entry.getValue());
             } else {
                 rank += entry.getValue();
-                updateIndexRank(pageId, lId, rank);
+                indexRepository.updateRank(pageId, lId, rank);
             }
-        } //for
+        }
 
         return true;
     }
@@ -567,12 +304,14 @@ public class IndexingServiceImpl implements IndexingService {
                 document = Jsoup.connect(url).userAgent(getOptions().getUserAgent())
                         .followRedirects(false)
                         .referrer(getOptions().getReferrer()).get();
-
-                if (getPageId(path, siteId) == NOTFOUND) { // page not found
-                    // Добавить информацию в page таблицу:
-                    insertPage(siteId, path, code, document.outerHtml());
+                int pageId = NOTFOUND;
+                for (Page page : pageRepository.findAllContains(path.toLowerCase(), siteId)) {
+                    pageId = page.getId();
+                    break;
+                }
+                if (pageId == NOTFOUND) {
+                    pageRepository.insert(siteId, path.toLowerCase(), code, document.outerHtml());
                 } else {
-                    // Страница path уже обрабатывалась
                     document = null;
                 }
             } catch (IOException e) {
@@ -581,8 +320,7 @@ public class IndexingServiceImpl implements IndexingService {
             }
         } else {
             document = null;
-            // Обновить информацию в site таблице:
-            updateSiteLastError(siteId, response.statusCode() + ' ' + response.statusMessage());
+            siteRepository.updateLastError(siteId, response.statusCode() + ' ' + response.statusMessage());
         }
 
         return document;

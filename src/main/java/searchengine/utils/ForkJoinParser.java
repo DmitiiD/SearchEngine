@@ -5,12 +5,17 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
-import searchengine.model.Language;
+import searchengine.model.*;
+import searchengine.repositories.IndexRepository;
+import searchengine.repositories.LemmaRepository;
+import searchengine.repositories.PageRepository;
+import searchengine.repositories.SiteRepository;
 import searchengine.services.IndexingServiceImpl;
 
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.RecursiveTask;
@@ -22,8 +27,14 @@ public class ForkJoinParser extends RecursiveTask<Set<String>> {
     private String host, parentLink, protocol;
     private int siteId;
     private IndexingServiceImpl idxService;
+    private IndexRepository indexRepository;
+    private LemmaRepository lemmaRepository;
+    private SiteRepository siteRepository;
+    private PageRepository pageRepository;
 
-    public ForkJoinParser(String url, int siteId, IndexingServiceImpl idxService) {
+    public ForkJoinParser(String url, int siteId, IndexingServiceImpl idxService,
+                          IndexRepository indexRepository, LemmaRepository lemmaRepository,
+                          SiteRepository siteRepository, PageRepository pageRepository) {
         float EPS = 0.00001f;
 
         for (Map.Entry<Integer, ForkJoinPool> entry : idxService.getIndexingPools().entrySet()) {
@@ -35,6 +46,10 @@ public class ForkJoinParser extends RecursiveTask<Set<String>> {
 
         this.siteId = siteId;
         this.idxService = idxService;
+        this.indexRepository = indexRepository;
+        this.lemmaRepository = lemmaRepository;
+        this.siteRepository = siteRepository;
+        this.pageRepository = pageRepository;
         doc = null;
 
         url = removeLastSymbol(url, '/').toLowerCase();
@@ -51,24 +66,27 @@ public class ForkJoinParser extends RecursiveTask<Set<String>> {
         int idx = protocol.length() + "://".length();
         parentLink = url.substring(idx);
 
-        System.out.println(url); // To console for showing process progress
-        // В процессе обхода постоянно обновлять дату и время в поле status_time таблицы site на текущее:
-        idxService.updateSiteCurrentStatusTime(siteId);
+        System.out.println(url);
+        siteRepository.updateStatusTime(siteId, LocalDateTime.now());
 
         Response response = getPageResponse();
         if (response == null) {
             System.out.println("Error getPageResponse() for " + url);
         } else {
-            String strTmp = removeLastSymbol(idxService.getSiteUrl(siteId), '/');
+            String strTmp = null;
+            for (Site site : siteRepository.findAllContains(siteId)) {
+                strTmp = removeLastSymbol(site.getUrl(), '/');
+                break;
+            }
             String path = strTmp == null ? "" : url.substring(strTmp.length());
             if (path.isEmpty()) {
-                path = "/"; // адрес страницы от корня сайта (должен начинаться со слэша, например: /news/372189/)
+                path = "/";
             }
             doc = getHtmlCode(response, path);
             if (doc == null) {
                 System.out.println("Error getHtmlCode() for " + url);
-            } else { // lemma, _index tables fulling
-                int pageId = idxService.getPageId(path, this.siteId);
+            } else {
+                int pageId = pageRepository.findAllContains(path.toLowerCase(), this.siteId).stream().findFirst().map(Page::getId).orElse(-1);
                 String text = doc.outerHtml();
 
                 LemmaFinder lemmaFinderRus, lemmaFinderEng;
@@ -82,28 +100,27 @@ public class ForkJoinParser extends RecursiveTask<Set<String>> {
                 Map<String, Integer> lemmasEng = new HashMap<>(lemmaFinderEng.collectLemmas(text, Language.ENG));
                 lemmas.putAll(lemmasEng);
                 for (Map.Entry<String, Integer> entry : lemmas.entrySet()) {
-                    // lemma insert/update
-                    int lId = idxService.getLemmaId(entry.getKey(), this.siteId);
+                    int lId = lemmaRepository.findAllContains(entry.getKey().toLowerCase(), this.siteId).stream().findFirst().map(Lemma::getId).orElse(-1);
                     if (lId == -1) {
-                        idxService.insertLemma(this.siteId, entry.getKey(), 1);
-                        lId = idxService.getLemmaId(entry.getKey(), this.siteId);
+                        String tmpStr = entry.getKey().toLowerCase();
+                        lemmaRepository.insert(this.siteId, tmpStr, 1);
+                        lId = lemmaRepository.findAllContains(tmpStr, this.siteId).stream().findFirst().map(Lemma::getId).orElse(-1);
                     } else {
-                        int freq = idxService.getLemmaFrequency(lId);
+                        int freq = lemmaRepository.findAllContainsByLemmaId(lId).stream().findFirst().map(Lemma::getFrequency).orElse(0);
                         ++freq;
-                        idxService.updateLemmaFrequency(lId, freq); //lemma table
+                        lemmaRepository.updateFrequency(lId, freq);
                     }
-                    // index insert/update
-                    float rank = idxService.getIndexRank(pageId, lId);
+                    float rank = indexRepository.findAllContains(pageId, lId).stream().findFirst().map(Index::getRank).orElse(0.0f);
                     if (rank <= EPS) {
-                        idxService.insertIndex(pageId, lId, entry.getValue());
+                        indexRepository.insert(pageId, lId, entry.getValue());
                     } else {
                         rank += entry.getValue();
-                        idxService.updateIndexRank(pageId, lId, rank);
+                        indexRepository.updateRank(pageId, lId, rank);
                     }
-                } //for
-            } // lemma, _index tables fulling
+                }
+            }
         }
-    } // constructor
+    }
 
     public Document getHtmlCode(Response response, String path) {
         Document document;
@@ -112,13 +129,12 @@ public class ForkJoinParser extends RecursiveTask<Set<String>> {
         if (response.statusCode() < 400) {
             try {
                 document = Jsoup.connect(url).userAgent(idxService.getOptions().getUserAgent())
-                        .followRedirects(false)
+                        .followRedirects(true)
                         .referrer(idxService.getOptions().getReferrer()).get();
-                if (idxService.getPageId(path, siteId) == -1) { // page not found
-                    // Добавить информацию в page таблицу:
-                    idxService.insertPage(siteId, path, code, document.outerHtml());
+                int pageId = pageRepository.findAllContains(path.toLowerCase(), siteId).stream().findFirst().map(Page::getId).orElse(-1);
+                if (pageId == -1) {
+                    pageRepository.insert(siteId, path.toLowerCase(), code, document.outerHtml());
                 } else {
-                    // Страница path уже обрабатывалась
                     document = null;
                 }
             } catch (IOException e) {
@@ -127,8 +143,7 @@ public class ForkJoinParser extends RecursiveTask<Set<String>> {
             }
         } else {
             document = null;
-            // Обновить информацию в site таблице:
-            idxService.updateSiteLastError(siteId, response.statusCode() + ' ' + response.statusMessage());
+            siteRepository.updateLastError(siteId, response.statusCode() + ' ' + response.statusMessage());
         }
 
         return document;
@@ -196,13 +211,14 @@ public class ForkJoinParser extends RecursiveTask<Set<String>> {
                     continue;
                 }
             }
-            if (!stringWithLink.contains(protocol + "://" + parentLink)) { // dismiss if not domestic host
+            if (!stringWithLink.contains(protocol + "://" + parentLink)) {
                 continue;
             }
 
             linksSet.add(removeLastSymbol(stringWithLink, '/'));
             if (!removeLastSymbol(stringWithLink, '/').equals(url)) {
-                ForkJoinParser fParser = new ForkJoinParser(removeLastSymbol(stringWithLink, '/'), siteId, idxService);
+                ForkJoinParser fParser = new ForkJoinParser(removeLastSymbol(stringWithLink, '/'), siteId, idxService,
+                        indexRepository, lemmaRepository, siteRepository, pageRepository);
                 if (fParser.getDoc() != null) {
                     fParser.fork();
                     subTasks.add(fParser);

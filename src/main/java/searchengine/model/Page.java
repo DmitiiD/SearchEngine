@@ -5,19 +5,11 @@ import lombok.Setter;
 
 import javax.persistence.*;
 
-//page — проиндексированные страницы сайта
 @Setter
 @Getter
 @Entity
 @Table(name = "page")
 public class Page {
-    /*id INT NOT NULL AUTO_INCREMENT;
-    site_id INT NOT NULL — ID веб-сайта из таблицы site;
-    path TEXT NOT NULL — адрес страницы от корня сайта (должен начинаться со слэша, например: /news/372189/);
-    code INT NOT NULL — код HTTP-ответа, полученный при запросе страницы (например, 200, 404, 500 или другие);
-    content MEDIUMTEXT NOT NULL — контент страницы (HTML-код).
-
-    По полю path должен быть установлен индекс*/
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
