@@ -72,52 +72,53 @@ public class ForkJoinParser extends RecursiveTask<Set<String>> {
         Response response = getPageResponse();
         if (response == null) {
             System.out.println("Error getPageResponse() for " + url);
-        } else {
-            String strTmp = null;
-            for (Site site : siteRepository.findAllContains(siteId)) {
-                strTmp = removeLastSymbol(site.getUrl(), '/');
-                break;
-            }
-            String path = strTmp == null ? "" : url.substring(strTmp.length());
-            if (path.isEmpty()) {
-                path = "/";
-            }
-            doc = getHtmlCode(response, path);
-            if (doc == null) {
-                System.out.println("Error getHtmlCode() for " + url);
-            } else {
-                int pageId = pageRepository.findAllContains(path.toLowerCase(), this.siteId).stream().findFirst().map(Page::getId).orElse(-1);
-                String text = doc.outerHtml();
+            return;
+        }
+        String strTmp = null;
+        for (Site site : siteRepository.findAllContains(siteId)) {
+            strTmp = removeLastSymbol(site.getUrl(), '/');
+            break;
+        }
+        String path = strTmp == null ? "" : url.substring(strTmp.length());
+        if (path.isEmpty()) {
+            path = "/";
+        }
 
-                LemmaFinder lemmaFinderRus, lemmaFinderEng;
-                try {
-                    lemmaFinderRus = LemmaFinder.getInstanceRus();
-                    lemmaFinderEng = LemmaFinder.getInstanceEng();
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-                Map<String, Integer> lemmas = new HashMap<>(lemmaFinderRus.collectLemmas(text, Language.RUS));
-                Map<String, Integer> lemmasEng = new HashMap<>(lemmaFinderEng.collectLemmas(text, Language.ENG));
-                lemmas.putAll(lemmasEng);
-                for (Map.Entry<String, Integer> entry : lemmas.entrySet()) {
-                    int lId = lemmaRepository.findAllContains(entry.getKey().toLowerCase(), this.siteId).stream().findFirst().map(Lemma::getId).orElse(-1);
-                    if (lId == -1) {
-                        String tmpStr = entry.getKey().toLowerCase();
-                        lemmaRepository.insert(this.siteId, tmpStr, 1);
-                        lId = lemmaRepository.findAllContains(tmpStr, this.siteId).stream().findFirst().map(Lemma::getId).orElse(-1);
-                    } else {
-                        int freq = lemmaRepository.findAllContainsByLemmaId(lId).stream().findFirst().map(Lemma::getFrequency).orElse(0);
-                        ++freq;
-                        lemmaRepository.updateFrequency(lId, freq);
-                    }
-                    float rank = indexRepository.findAllContains(pageId, lId).stream().findFirst().map(Index::getRank).orElse(0.0f);
-                    if (rank <= EPS) {
-                        indexRepository.insert(pageId, lId, entry.getValue());
-                    } else {
-                        rank += entry.getValue();
-                        indexRepository.updateRank(pageId, lId, rank);
-                    }
-                }
+        doc = getHtmlCode(response, path);
+        if (doc == null) {
+            System.out.println("Error getHtmlCode() for " + url);
+            return;
+        }
+        int pageId = pageRepository.findAllContains(path.toLowerCase(), this.siteId).stream().findFirst().map(Page::getId).orElse(-1);
+        String text = doc.outerHtml();
+
+        LemmaFinder lemmaFinderRus, lemmaFinderEng;
+        try {
+            lemmaFinderRus = LemmaFinder.getInstanceRus();
+            lemmaFinderEng = LemmaFinder.getInstanceEng();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        Map<String, Integer> lemmas = new HashMap<>(lemmaFinderRus.collectLemmas(text, Language.RUS));
+        Map<String, Integer> lemmasEng = new HashMap<>(lemmaFinderEng.collectLemmas(text, Language.ENG));
+        lemmas.putAll(lemmasEng);
+        for (Map.Entry<String, Integer> entry : lemmas.entrySet()) {
+            int lId = lemmaRepository.findAllContains(entry.getKey().toLowerCase(), this.siteId).stream().findFirst().map(Lemma::getId).orElse(-1);
+            if (lId == -1) {
+                String tmpStr = entry.getKey().toLowerCase();
+                lemmaRepository.insert(this.siteId, tmpStr, 1);
+                lId = lemmaRepository.findAllContains(tmpStr, this.siteId).stream().findFirst().map(Lemma::getId).orElse(-1);
+            } else {
+                int freq = lemmaRepository.findAllContainsByLemmaId(lId).stream().findFirst().map(Lemma::getFrequency).orElse(0);
+                ++freq;
+                lemmaRepository.updateFrequency(lId, freq);
+            }
+            float rank = indexRepository.findAllContains(pageId, lId).stream().findFirst().map(Index::getRank).orElse(0.0f);
+            if (rank <= EPS) {
+                indexRepository.insert(pageId, lId, entry.getValue());
+            } else {
+                rank += entry.getValue();
+                indexRepository.updateRank(pageId, lId, rank);
             }
         }
     }
@@ -174,10 +175,11 @@ public class ForkJoinParser extends RecursiveTask<Set<String>> {
     @Override
     protected Set<String> compute() {
         for (Map.Entry<Integer, ForkJoinPool> entry : idxService.getIndexingPools().entrySet()) {
-            if (entry.getValue().isTerminating()) {
-                System.out.println("Shutdown flag has been found for " + url);
-                return null;
+            if (!entry.getValue().isTerminating()) {
+                continue;
             }
+            System.out.println("Shutdown flag has been found for " + url);
+            return null;
         }
 
         if (doc == null) {
@@ -216,13 +218,14 @@ public class ForkJoinParser extends RecursiveTask<Set<String>> {
             }
 
             linksSet.add(removeLastSymbol(stringWithLink, '/'));
-            if (!removeLastSymbol(stringWithLink, '/').equals(url)) {
-                ForkJoinParser fParser = new ForkJoinParser(removeLastSymbol(stringWithLink, '/'), siteId, idxService,
-                        indexRepository, lemmaRepository, siteRepository, pageRepository);
-                if (fParser.getDoc() != null) {
-                    fParser.fork();
-                    subTasks.add(fParser);
-                }
+            if (removeLastSymbol(stringWithLink, '/').equals(url)) {
+                continue;
+            }
+            ForkJoinParser fParser = new ForkJoinParser(removeLastSymbol(stringWithLink, '/'), siteId, idxService,
+                    indexRepository, lemmaRepository, siteRepository, pageRepository);
+            if (fParser.getDoc() != null) {
+                fParser.fork();
+                subTasks.add(fParser);
             }
         }
 
