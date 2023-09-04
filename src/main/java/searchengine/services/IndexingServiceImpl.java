@@ -211,7 +211,7 @@ public class IndexingServiceImpl implements IndexingService {
         return setIndexingResult(true, "");
     }
 
-    public boolean indexPageTreatment(String url, int siteId, String pageUrl/*page.path*/) {
+    public boolean indexPageTreatment(String url, int siteId, String pageUrl) {
         Document doc;
         int pageId = NOTFOUND;
 
@@ -224,7 +224,7 @@ public class IndexingServiceImpl implements IndexingService {
             for (Index index : indexRepository.findAllContains(pageId)) {
                 lemmaIds.add(index.getLemmaId());
             }
-            indexRepository.deleteByPageId(pageId); //index table clearing
+            indexRepository.deleteByPageId(pageId);
             for (int lemmaId : lemmaIds) {
                 int freq = NOTFOUND;
                 for (Lemma lemma : lemmaRepository.findAllContainsByLemmaId(lemmaId)) {
@@ -232,7 +232,7 @@ public class IndexingServiceImpl implements IndexingService {
                     break;
                 }
                 if (freq == 1) {
-                    lemmaRepository.deleteById(lemmaId); //lemma table clearing
+                    lemmaRepository.deleteById(lemmaId);
                 } else {
                     if (freq != NOTFOUND) {
                         lemmaRepository.updateFrequency(lemmaId, freq - 1);
