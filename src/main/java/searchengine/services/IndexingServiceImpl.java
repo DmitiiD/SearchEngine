@@ -123,9 +123,9 @@ public class IndexingServiceImpl implements IndexingService {
         }
 
         if (indexingPools.size() != siteRepository.getStatusCount(Status.INDEXING.toString())) {
-            System.out.println("ForkJoinPool not synchronized with count of indexing sites. Waiting 60 seconds ...");
+            System.out.println("ForkJoinPool not synchronized with count of indexing sites. Waiting " + Constants.WAIT_SECONDS + " seconds ...");
             try {
-                Thread.sleep(60000);
+                Thread.sleep(Constants.WAIT_SECONDS * 1000);
             } catch (InterruptedException ex) {
                 ex.printStackTrace();
             }
@@ -148,10 +148,10 @@ public class IndexingServiceImpl implements IndexingService {
             }
             entry.getValue().shutdown();
             try {
-                if (!entry.getValue().awaitTermination(60, TimeUnit.SECONDS)) {
+                if (!entry.getValue().awaitTermination(Constants.WAIT_SECONDS, TimeUnit.SECONDS)) {
                     entry.getValue().shutdownNow();
-                    if (!entry.getValue().awaitTermination(60, TimeUnit.SECONDS)) {
-                        System.err.println("Pool (siteId ==" + entry.getKey() + ") did not terminate");
+                    if (!entry.getValue().awaitTermination(Constants.WAIT_SECONDS, TimeUnit.SECONDS)) {
+                        System.err.println("Pool (siteId == " + entry.getKey() + ") did not terminate");
                     } else {
                         setSuccessfulIndexStoppingStatus(entry.getKey());
                         iterator.remove();
