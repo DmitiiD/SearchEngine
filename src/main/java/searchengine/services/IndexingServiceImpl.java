@@ -216,11 +216,7 @@ public class IndexingServiceImpl implements IndexingService {
         }
         indexRepository.deleteByPageId(pageId);
         for (int lemmaId : lemmaIds) {
-            int freq = Constants.NOTFOUND;
-            for (Lemma lemma : lemmaRepository.findAllContainsByLemmaId(lemmaId)) {
-                freq = lemma.getFrequency();
-                break;
-            }
+            int freq = lemmaRepository.findAllContainsByLemmaId(lemmaId).stream().findFirst().map(Lemma::getFrequency).orElse(Constants.NOTFOUND);
             if (freq == 1) {
                 lemmaRepository.deleteById(lemmaId);
                 continue;
