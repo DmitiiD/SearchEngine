@@ -190,15 +190,15 @@ public class SearchServiceImpl implements SearchService {
             int pos = noHtml.indexOf(word);
             if (pos != -1) {
                 int b, e;
-                if (pos - Constants.SNIPPETSYMBOLSCOUNT <= 0) {
+                if (pos - Constants.SNIPPET_SYMBOLS_COUNT <= 0) {
                     b = pos;
                 } else {
-                    b = pos - Constants.SNIPPETSYMBOLSCOUNT;
+                    b = pos - Constants.SNIPPET_SYMBOLS_COUNT;
                 }
-                if (noHtml.length() - Constants.SNIPPETSYMBOLSCOUNT <= 0) {
+                if (noHtml.length() - Constants.SNIPPET_SYMBOLS_COUNT <= 0) {
                     e = pos + word.length();
                 } else {
-                    e = pos + Constants.SNIPPETSYMBOLSCOUNT - 1;
+                    e = pos + Constants.SNIPPET_SYMBOLS_COUNT - 1;
                 }
                 String subNoHtml = noHtml.substring(b, e);
                 if (!snippet.isEmpty()) {
