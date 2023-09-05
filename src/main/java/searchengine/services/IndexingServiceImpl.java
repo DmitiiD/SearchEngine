@@ -2,6 +2,7 @@ package searchengine.services;
 
 import lombok.Getter;
 import org.springframework.stereotype.Service;
+import searchengine.config.Constants;
 import searchengine.config.Messages;
 import searchengine.config.Options;
 import searchengine.config.SitesList;
@@ -28,8 +29,6 @@ import searchengine.utils.LemmaFinder;
 @Getter
 
 public class IndexingServiceImpl implements IndexingService {
-    private final int NOTFOUND = -1;
-    private final float EPS = 0.00001f;
     private final SitesList sites;
     private final Options options;
     private final SiteRepository siteRepository;
@@ -55,8 +54,8 @@ public class IndexingServiceImpl implements IndexingService {
 
     public void clearTables() {
         for (searchengine.config.Site site : sites.getSites()) {
-            int sId = siteRepository.findAllContains(site.getUrl().toLowerCase(), site.getName().toLowerCase()).stream().findFirst().map(Site::getId).orElse(NOTFOUND);
-            if (sId == NOTFOUND) {
+            int sId = siteRepository.findAllContains(site.getUrl().toLowerCase(), site.getName().toLowerCase()).stream().findFirst().map(Site::getId).orElse(Constants.NOTFOUND);
+            if (sId == Constants.NOTFOUND) {
                 continue;
             }
             lemmaRepository.deleteBySiteId(sId);
@@ -94,8 +93,8 @@ public class IndexingServiceImpl implements IndexingService {
         }
 
         for (searchengine.config.Site site : sites.getSites()) {
-            int sId = siteRepository.findAllContains(site.getUrl().toLowerCase(), site.getName().toLowerCase()).stream().findFirst().map(Site::getId).orElse(NOTFOUND);
-            if (sId == NOTFOUND) {
+            int sId = siteRepository.findAllContains(site.getUrl().toLowerCase(), site.getName().toLowerCase()).stream().findFirst().map(Site::getId).orElse(Constants.NOTFOUND);
+            if (sId == Constants.NOTFOUND) {
                 continue;
             }
             Thread thread =
@@ -173,24 +172,23 @@ public class IndexingServiceImpl implements IndexingService {
         if (i == 0) {
             indexingPools.clear();
             return setIndexingResult(true, "");
-        } else {
-            return setIndexingResult(false, Messages.indexingStoppingError);
         }
+        return setIndexingResult(false, Messages.indexingStoppingError);
     }
 
     @Override
     public IndexingResponse indexPage(String url) {
         String siteFnd = "";
-        int sId = NOTFOUND;
+        int sId = Constants.NOTFOUND;
         for (searchengine.config.Site site : sites.getSites()) {
             if (!url.contains(site.getUrl())) {
                 continue;
             }
             siteFnd = site.getUrl();
-            sId = siteRepository.findAllContains(site.getUrl().toLowerCase(), site.getName().toLowerCase()).stream().findFirst().map(Site::getId).orElse(NOTFOUND);
-            if (sId == NOTFOUND) {
+            sId = siteRepository.findAllContains(site.getUrl().toLowerCase(), site.getName().toLowerCase()).stream().findFirst().map(Site::getId).orElse(Constants.NOTFOUND);
+            if (sId == Constants.NOTFOUND) {
                 siteRepository.insert(site.getUrl().toLowerCase(), site.getName().toLowerCase(), Status.INDEXED.toString(), LocalDateTime.now());
-                sId = siteRepository.findAllContains(site.getUrl().toLowerCase(), site.getName().toLowerCase()).stream().findFirst().map(Site::getId).orElse(NOTFOUND);
+                sId = siteRepository.findAllContains(site.getUrl().toLowerCase(), site.getName().toLowerCase()).stream().findFirst().map(Site::getId).orElse(Constants.NOTFOUND);
             }
             break;
         }
@@ -218,17 +216,17 @@ public class IndexingServiceImpl implements IndexingService {
         }
         indexRepository.deleteByPageId(pageId);
         for (int lemmaId : lemmaIds) {
-            int freq = NOTFOUND;
+            int freq = Constants.NOTFOUND;
             for (Lemma lemma : lemmaRepository.findAllContainsByLemmaId(lemmaId)) {
                 freq = lemma.getFrequency();
                 break;
             }
             if (freq == 1) {
                 lemmaRepository.deleteById(lemmaId);
-            } else {
-                if (freq != NOTFOUND) {
-                    lemmaRepository.updateFrequency(lemmaId, freq - 1);
-                }
+                continue;
+            }
+            if (freq != Constants.NOTFOUND) {
+                lemmaRepository.updateFrequency(lemmaId, freq - 1);
             }
         }
         pageRepository.deleteById(pageId);
@@ -236,9 +234,9 @@ public class IndexingServiceImpl implements IndexingService {
 
     public boolean indexPageTreatment(String url, int siteId, String pageUrl) {
         Document doc;
-        int pageId = pageRepository.findAllContains(pageUrl.toLowerCase(), siteId).stream().findFirst().map(Page::getId).orElse(NOTFOUND);
+        int pageId = pageRepository.findAllContains(pageUrl.toLowerCase(), siteId).stream().findFirst().map(Page::getId).orElse(Constants.NOTFOUND);
 
-        if (pageId != NOTFOUND) {
+        if (pageId != Constants.NOTFOUND) {
             deletePage(pageId);
         }
         url = removeLastSymbol(url, '/').toLowerCase();
@@ -255,7 +253,7 @@ public class IndexingServiceImpl implements IndexingService {
             return false;
         }
 
-        pageId = pageRepository.findAllContains(pageUrl.toLowerCase(), siteId).stream().findFirst().map(Page::getId).orElse(NOTFOUND);
+        pageId = pageRepository.findAllContains(pageUrl.toLowerCase(), siteId).stream().findFirst().map(Page::getId).orElse(Constants.NOTFOUND);
         String text = doc.outerHtml();
 
         Map<String, Integer> lemmas = new HashMap<>(lemmaFinderRus.collectLemmas(text, Language.RUS));
@@ -263,18 +261,18 @@ public class IndexingServiceImpl implements IndexingService {
         lemmas.putAll(lemmasEng);
 
         for (Map.Entry<String, Integer> entry : lemmas.entrySet()) {
-            int lId = lemmaRepository.findAllContains(entry.getKey().toLowerCase(), siteId).stream().findFirst().map(Lemma::getId).orElse(NOTFOUND);
-            if (lId == NOTFOUND) {
+            int lId = lemmaRepository.findAllContains(entry.getKey().toLowerCase(), siteId).stream().findFirst().map(Lemma::getId).orElse(Constants.NOTFOUND);
+            if (lId == Constants.NOTFOUND) {
                 lemmaRepository.insert(siteId, entry.getKey().toLowerCase(), 1);
-                lId = lemmaRepository.findAllContains(entry.getKey().toLowerCase(), siteId).stream().findFirst().map(Lemma::getId).orElse(NOTFOUND);
+                lId = lemmaRepository.findAllContains(entry.getKey().toLowerCase(), siteId).stream().findFirst().map(Lemma::getId).orElse(Constants.NOTFOUND);
             }
             float rank = indexRepository.findAllContains(pageId, lId).stream().findFirst().map(Index::getRank).orElse(0.0f);
-            if (rank <= EPS) {
+            if (rank <= Constants.EPS) {
                 indexRepository.insert(pageId, lId, entry.getValue());
-            } else {
-                rank += entry.getValue();
-                indexRepository.updateRank(pageId, lId, rank);
+                continue;
             }
+            rank += entry.getValue();
+            indexRepository.updateRank(pageId, lId, rank);
         }
 
         return true;
@@ -289,8 +287,8 @@ public class IndexingServiceImpl implements IndexingService {
                 document = Jsoup.connect(url).userAgent(getOptions().getUserAgent())
                         .followRedirects(false)
                         .referrer(getOptions().getReferrer()).get();
-                int pageId = pageRepository.findAllContains(path.toLowerCase(), siteId).stream().findFirst().map(Page::getId).orElse(NOTFOUND);
-                if (pageId == NOTFOUND) {
+                int pageId = pageRepository.findAllContains(path.toLowerCase(), siteId).stream().findFirst().map(Page::getId).orElse(Constants.NOTFOUND);
+                if (pageId == Constants.NOTFOUND) {
                     pageRepository.insert(siteId, path.toLowerCase(), code, document.outerHtml());
                 } else {
                     document = null;

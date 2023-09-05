@@ -2,6 +2,7 @@ package searchengine.services;
 
 import lombok.Getter;
 import org.springframework.stereotype.Service;
+import searchengine.config.Constants;
 import searchengine.config.Messages;
 import searchengine.config.Site;
 import searchengine.config.SitesList;
@@ -25,9 +26,6 @@ import java.util.stream.Collectors;
 @Getter
 
 public class SearchServiceImpl implements SearchService {
-    private final int PROCPAGES = 70;
-    private final int SNIPPETSYMBOLSCOUNT = 50;
-    private final float EPS = 0.00001f;
     private final IndexingServiceImpl indexingService;
     private final SiteRepository siteRepository;
     private final PageRepository pageRepository;
@@ -96,7 +94,7 @@ public class SearchServiceImpl implements SearchService {
         Iterator<Map.Entry<String, Integer>> iterator02 = lemmaFreqMap.entrySet().iterator();
         while (iterator02.hasNext()) {
             Map.Entry<String, Integer> entry = iterator02.next();
-            if ((lemmaFreqMap.size() > 1) && ((float) entry.getValue() / cntPgs * 100 >= PROCPAGES)) {
+            if ((lemmaFreqMap.size() > 1) && ((float) entry.getValue() / cntPgs * 100 >= Constants.PROCPAGES)) {
                 iterator02.remove();
             }
         }
@@ -137,11 +135,11 @@ public class SearchServiceImpl implements SearchService {
             return null;
         }
         LinkedHashMap<Integer, Float> pageIdRankRel = new LinkedHashMap<>();
-        float maxRel = EPS;
+        float maxRel = Constants.EPS;
         for (int pageId : pageIds) {
             float rankAbs = indexRepository.getIndexSumRank(pageId, lemmaIds);
             pageIdRankRel.put(pageId, rankAbs);
-            if ((maxRel - rankAbs) < EPS) {
+            if ((maxRel - rankAbs) < Constants.EPS) {
                 maxRel = rankAbs;
             }
         }
@@ -192,15 +190,15 @@ public class SearchServiceImpl implements SearchService {
             int pos = noHtml.indexOf(word);
             if (pos != -1) {
                 int b, e;
-                if (pos - SNIPPETSYMBOLSCOUNT <= 0) {
+                if (pos - Constants.SNIPPETSYMBOLSCOUNT <= 0) {
                     b = pos;
                 } else {
-                    b = pos - SNIPPETSYMBOLSCOUNT;
+                    b = pos - Constants.SNIPPETSYMBOLSCOUNT;
                 }
-                if (noHtml.length() - SNIPPETSYMBOLSCOUNT <= 0) {
+                if (noHtml.length() - Constants.SNIPPETSYMBOLSCOUNT <= 0) {
                     e = pos + word.length();
                 } else {
-                    e = pos + SNIPPETSYMBOLSCOUNT - 1;
+                    e = pos + Constants.SNIPPETSYMBOLSCOUNT - 1;
                 }
                 String subNoHtml = noHtml.substring(b, e);
                 if (!snippet.isEmpty()) {

@@ -5,6 +5,7 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+import searchengine.config.Constants;
 import searchengine.model.*;
 import searchengine.repositories.IndexRepository;
 import searchengine.repositories.LemmaRepository;
@@ -21,7 +22,6 @@ import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.RecursiveTask;
 
 public class ForkJoinParser extends RecursiveTask<Set<String>> {
-    private static final int HANDSHAKE_TIMEOUT = 150;
     private String url;
     private Document doc;
     private String host, parentLink, protocol;
@@ -89,7 +89,7 @@ public class ForkJoinParser extends RecursiveTask<Set<String>> {
             System.out.println("Error getHtmlCode() for " + url);
             return;
         }
-        int pageId = pageRepository.findAllContains(path.toLowerCase(), this.siteId).stream().findFirst().map(Page::getId).orElse(-1);
+        int pageId = pageRepository.findAllContains(path.toLowerCase(), this.siteId).stream().findFirst().map(Page::getId).orElse(Constants.NOTFOUND);
         String text = doc.outerHtml();
 
         LemmaFinder lemmaFinderRus, lemmaFinderEng;
@@ -103,11 +103,11 @@ public class ForkJoinParser extends RecursiveTask<Set<String>> {
         Map<String, Integer> lemmasEng = new HashMap<>(lemmaFinderEng.collectLemmas(text, Language.ENG));
         lemmas.putAll(lemmasEng);
         for (Map.Entry<String, Integer> entry : lemmas.entrySet()) {
-            int lId = lemmaRepository.findAllContains(entry.getKey().toLowerCase(), this.siteId).stream().findFirst().map(Lemma::getId).orElse(-1);
-            if (lId == -1) {
+            int lId = lemmaRepository.findAllContains(entry.getKey().toLowerCase(), this.siteId).stream().findFirst().map(Lemma::getId).orElse(Constants.NOTFOUND);
+            if (lId == Constants.NOTFOUND) {
                 String tmpStr = entry.getKey().toLowerCase();
                 lemmaRepository.insert(this.siteId, tmpStr, 1);
-                lId = lemmaRepository.findAllContains(tmpStr, this.siteId).stream().findFirst().map(Lemma::getId).orElse(-1);
+                lId = lemmaRepository.findAllContains(tmpStr, this.siteId).stream().findFirst().map(Lemma::getId).orElse(Constants.NOTFOUND);
             } else {
                 int freq = lemmaRepository.findAllContainsByLemmaId(lId).stream().findFirst().map(Lemma::getFrequency).orElse(0);
                 ++freq;
@@ -116,10 +116,10 @@ public class ForkJoinParser extends RecursiveTask<Set<String>> {
             float rank = indexRepository.findAllContains(pageId, lId).stream().findFirst().map(Index::getRank).orElse(0.0f);
             if (rank <= EPS) {
                 indexRepository.insert(pageId, lId, entry.getValue());
-            } else {
-                rank += entry.getValue();
-                indexRepository.updateRank(pageId, lId, rank);
+                continue;
             }
+            rank += entry.getValue();
+            indexRepository.updateRank(pageId, lId, rank);
         }
     }
 
@@ -132,8 +132,8 @@ public class ForkJoinParser extends RecursiveTask<Set<String>> {
                 document = Jsoup.connect(url).userAgent(idxService.getOptions().getUserAgent())
                         .followRedirects(true)
                         .referrer(idxService.getOptions().getReferrer()).get();
-                int pageId = pageRepository.findAllContains(path.toLowerCase(), siteId).stream().findFirst().map(Page::getId).orElse(-1);
-                if (pageId == -1) {
+                int pageId = pageRepository.findAllContains(path.toLowerCase(), siteId).stream().findFirst().map(Page::getId).orElse(Constants.NOTFOUND);
+                if (pageId == Constants.NOTFOUND) {
                     pageRepository.insert(siteId, path.toLowerCase(), code, document.outerHtml());
                 } else {
                     document = null;
@@ -193,7 +193,7 @@ public class ForkJoinParser extends RecursiveTask<Set<String>> {
         List<ForkJoinParser> subTasks = new LinkedList<>();
 
         try {
-            Thread.sleep(HANDSHAKE_TIMEOUT);
+            Thread.sleep(Constants.HANDSHAKE_TIMEOUT);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
