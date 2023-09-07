@@ -155,12 +155,12 @@ public class IndexingServiceImpl implements IndexingService {
                     } else {
                         setSuccessfulIndexStoppingStatus(entry.getKey());
                         iterator.remove();
-                        --i;
+                        i--;
                     }
                 } else {
                     setSuccessfulIndexStoppingStatus(entry.getKey());
                     iterator.remove();
-                    --i;
+                    i--;
                 }
             } catch (InterruptedException ex) {
                 entry.getValue().shutdownNow();
@@ -275,27 +275,27 @@ public class IndexingServiceImpl implements IndexingService {
     }
 
     public Document getHtmlCode(Response response, String url, int siteId, String path) {
-        Document document;
         int code = response.statusCode();
 
-        if (response.statusCode() < 400) {
-            try {
-                document = Jsoup.connect(url).userAgent(getOptions().getUserAgent())
-                        .followRedirects(false)
-                        .referrer(getOptions().getReferrer()).get();
-                int pageId = pageRepository.findAllContains(path.toLowerCase(), siteId).stream().findFirst().map(Page::getId).orElse(Constants.NOTFOUND);
-                if (pageId == Constants.NOTFOUND) {
-                    pageRepository.insert(siteId, path.toLowerCase(), code, document.outerHtml());
-                } else {
-                    document = null;
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
+        if (code >= 400) {
+            siteRepository.updateLastError(siteId, code + ' ' + response.statusMessage());
+            return null;
+        }
+
+        Document document;
+        try {
+            document = Jsoup.connect(url).userAgent(getOptions().getUserAgent())
+                    .followRedirects(false)
+                    .referrer(getOptions().getReferrer()).get();
+            int pageId = pageRepository.findAllContains(path.toLowerCase(), siteId).stream().findFirst().map(Page::getId).orElse(Constants.NOTFOUND);
+            if (pageId == Constants.NOTFOUND) {
+                pageRepository.insert(siteId, path.toLowerCase(), code, document.outerHtml());
+            } else {
                 document = null;
             }
-        } else {
+        } catch (IOException e) {
+            e.printStackTrace();
             document = null;
-            siteRepository.updateLastError(siteId, response.statusCode() + ' ' + response.statusMessage());
         }
 
         return document;

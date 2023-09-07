@@ -188,32 +188,33 @@ public class SearchServiceImpl implements SearchService {
                 }
             }
             int pos = noHtml.indexOf(word);
-            if (pos != -1) {
-                int b, e;
-                if (pos - Constants.SNIPPET_SYMBOLS_COUNT <= 0) {
-                    b = pos;
-                } else {
-                    b = pos - Constants.SNIPPET_SYMBOLS_COUNT;
-                }
-                if (noHtml.length() - Constants.SNIPPET_SYMBOLS_COUNT <= 0) {
-                    e = pos + word.length();
-                } else {
-                    e = pos + Constants.SNIPPET_SYMBOLS_COUNT - 1;
-                }
-                String subNoHtml = noHtml.substring(b, e);
-                if (!snippet.isEmpty()) {
-                    snippet = snippet.concat("\n").concat("\r");
-                }
-                int bSubNoHtml, eSubNoHtml;
-                bSubNoHtml = subNoHtml.indexOf(word);
-                eSubNoHtml = bSubNoHtml + word.length();
-                String str = subNoHtml.substring(eSubNoHtml, subNoHtml.length() - 1);
-                if (bSubNoHtml == 0) {
-                    snippet = snippet.concat("<b>").concat(word).concat("</b>").concat(str);
-                } else {
-                    snippet = snippet.concat(subNoHtml.substring(0, bSubNoHtml)).concat("<b>")
-                            .concat(word).concat("</b>").concat(str);
-                }
+            if (pos == -1) {
+                continue;
+            }
+            int b, e;
+            if (pos - Constants.SNIPPET_SYMBOLS_COUNT <= 0) {
+                b = pos;
+            } else {
+                b = pos - Constants.SNIPPET_SYMBOLS_COUNT;
+            }
+            if (noHtml.length() - Constants.SNIPPET_SYMBOLS_COUNT <= 0) {
+                e = pos + word.length();
+            } else {
+                e = pos + Constants.SNIPPET_SYMBOLS_COUNT - 1;
+            }
+            String subNoHtml = noHtml.substring(b, e);
+            if (!snippet.isEmpty()) {
+                snippet = snippet.concat("\n").concat("\r");
+            }
+            int bSubNoHtml, eSubNoHtml;
+            bSubNoHtml = subNoHtml.indexOf(word);
+            eSubNoHtml = bSubNoHtml + word.length();
+            String str = subNoHtml.substring(eSubNoHtml, subNoHtml.length() - 1);
+            if (bSubNoHtml == 0) {
+                snippet = snippet.concat("<b>").concat(word).concat("</b>").concat(str);
+            } else {
+                snippet = snippet.concat(subNoHtml.substring(0, bSubNoHtml)).concat("<b>")
+                        .concat(word).concat("</b>").concat(str);
             }
         }
 

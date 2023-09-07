@@ -110,7 +110,7 @@ public class ForkJoinParser extends RecursiveTask<Set<String>> {
                 lId = lemmaRepository.findAllContains(tmpStr, this.siteId).stream().findFirst().map(Lemma::getId).orElse(Constants.NOTFOUND);
             } else {
                 int freq = lemmaRepository.findAllContainsByLemmaId(lId).stream().findFirst().map(Lemma::getFrequency).orElse(0);
-                ++freq;
+                freq++;
                 lemmaRepository.updateFrequency(lId, freq);
             }
             float rank = indexRepository.findAllContains(pageId, lId).stream().findFirst().map(Index::getRank).orElse(0.0f);
@@ -124,27 +124,27 @@ public class ForkJoinParser extends RecursiveTask<Set<String>> {
     }
 
     public Document getHtmlCode(Response response, String path) {
-        Document document;
         int code = response.statusCode();
 
-        if (response.statusCode() < 400) {
-            try {
-                document = Jsoup.connect(url).userAgent(idxService.getOptions().getUserAgent())
-                        .followRedirects(true)
-                        .referrer(idxService.getOptions().getReferrer()).get();
-                int pageId = pageRepository.findAllContains(path.toLowerCase(), siteId).stream().findFirst().map(Page::getId).orElse(Constants.NOTFOUND);
-                if (pageId == Constants.NOTFOUND) {
-                    pageRepository.insert(siteId, path.toLowerCase(), code, document.outerHtml());
-                } else {
-                    document = null;
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
+        if (code >= 400) {
+            siteRepository.updateLastError(siteId, code + ' ' + response.statusMessage());
+            return null;
+        }
+
+        Document document;
+        try {
+            document = Jsoup.connect(url).userAgent(idxService.getOptions().getUserAgent())
+                    .followRedirects(true)
+                    .referrer(idxService.getOptions().getReferrer()).get();
+            int pageId = pageRepository.findAllContains(path.toLowerCase(), siteId).stream().findFirst().map(Page::getId).orElse(Constants.NOTFOUND);
+            if (pageId == Constants.NOTFOUND) {
+                pageRepository.insert(siteId, path.toLowerCase(), code, document.outerHtml());
+            } else {
                 document = null;
             }
-        } else {
+        } catch (IOException e) {
+            e.printStackTrace();
             document = null;
-            siteRepository.updateLastError(siteId, response.statusCode() + ' ' + response.statusMessage());
         }
 
         return document;
