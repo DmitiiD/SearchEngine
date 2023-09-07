@@ -35,8 +35,6 @@ public class ForkJoinParser extends RecursiveTask<Set<String>> {
     public ForkJoinParser(String url, int siteId, IndexingServiceImpl idxService,
                           IndexRepository indexRepository, LemmaRepository lemmaRepository,
                           SiteRepository siteRepository, PageRepository pageRepository) {
-        float EPS = 0.00001f;
-
         for (Map.Entry<Integer, ForkJoinPool> entry : idxService.getIndexingPools().entrySet()) {
             if (entry.getValue().isTerminating()) {
                 System.out.println("Shutdown flag has been found for " + url);
@@ -114,7 +112,7 @@ public class ForkJoinParser extends RecursiveTask<Set<String>> {
                 lemmaRepository.updateFrequency(lId, freq);
             }
             float rank = indexRepository.findAllContains(pageId, lId).stream().findFirst().map(Index::getRank).orElse(0.0f);
-            if (rank <= EPS) {
+            if (rank <= Constants.EPS) {
                 indexRepository.insert(pageId, lId, entry.getValue());
                 continue;
             }
