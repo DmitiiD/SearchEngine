@@ -257,6 +257,7 @@ public class SearchServiceImpl implements SearchService {
                 content = pageRepository.getContent(entry.getKey(), sId);
                 snippet = getSnippet(content, query);
                 if (snippet.isEmpty()) {
+                    count--;
                     continue;
                 }
                 DataSearchItem item = new DataSearchItem();
@@ -271,7 +272,10 @@ public class SearchServiceImpl implements SearchService {
             }
         }
 
-        return setSearchResponse(true, "", count, data, offset, limit);
+        List<DataSearchItem> dataLimitRange = data.size() > (offset + limit) ? new ArrayList<>(data.subList(offset, offset + limit)) :
+                new ArrayList<>(data.subList(offset, data.size()));
+
+        return setSearchResponse(true, "", count, dataLimitRange, offset, limit);
     }
 
     public SearchResponse setSearchResponse(boolean bRes, String err, int count, List<DataSearchItem> data, int offset, int limit) {
